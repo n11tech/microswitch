@@ -1,0 +1,31 @@
+version: v1
+kind: EmbeddedDeployment
+domain: basket
+platform: prod
+embeddedServices:
+  get-basket:
+    metadata:
+      name: get-basket
+    spec:
+      deployment:
+        strategy: canary
+        canaryPercentage: 30/70
+        algorithm: random
+        enabled: true
+  service2:
+    metadata:
+      name: get-basket
+    spec:
+      deployment:
+        strategy: blueGreen
+        weight: 0/1
+        ttl: 0
+        enabled: true
+  service3:
+    metadata:
+      name: get-basket
+    spec:
+      deployment:
+        strategy: shadow
+        shadowWeight: 5
+        enabled: true
