@@ -1,7 +1,7 @@
 library 'n11'
 
 buildAndPushJarToNexus {
-   project = 'architecture'
+   project = 'development'
    service = 'microswitch'
    nexusRepository='releases'
    nexusGroup ='com/n11/'
