@@ -2,7 +2,7 @@ library 'n11'
 
 buildAndPushJarToNexus {
    project = 'architecture'
-   service = 'hexagonal-ddd-archetype'
+   service = 'microswitch'
    nexusRepository='releases'
    nexusGroup ='com/n11/'
    isJava21='true'
