@@ -1,5 +1,0 @@
-library 'n11'
-
-mvnUpdate {
-   javaVersion = '21'
-}
