@@ -1,7 +1,7 @@
-package com.n11.development.core.strategy;
+package com.microswitch.domain.strategy;
 
-import com.n11.development.infrastructure.metrics.DeploymentMetrics;
-import com.n11.development.properties.MicroswitchProperties;
+import com.microswitch.application.metric.DeploymentMetrics;
+import com.microswitch.domain.InitializerConfiguration;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Objects;
@@ -11,9 +11,9 @@ import java.util.function.Supplier;
 @Slf4j
 public class Shadow extends DeployTemplate implements IDeploymentStrategy {
     private static final byte DEFAULT_SHADOW_WEIGH = 1;
-    private static Short _weightCounter = (int) DEFAULT_SHADOW_WEIGH;
+    private static Short weightCounter = (int) DEFAULT_SHADOW_WEIGH;
 
-    protected Shadow(MicroswitchProperties properties, DeploymentMetrics deploymentMetrics) {
+    protected Shadow(InitializerConfiguration properties, DeploymentMetrics deploymentMetrics) {
         super(properties, deploymentMetrics);
     }
 
@@ -33,13 +33,13 @@ public class Shadow extends DeployTemplate implements IDeploymentStrategy {
 
         R result;
         boolean executedShadow = false;
-        
-        if (weight >= DEFAULT_SHADOW_WEIGH && weight.equals(_weightCounter)) {
-            _weightCounter = (int) DEFAULT_SHADOW_WEIGH;
+
+        if (weight >= DEFAULT_SHADOW_WEIGH && weight.equals(weightCounter)) {
+            weightCounter = (int) DEFAULT_SHADOW_WEIGH;
             result = executeAsyncSimultaneously(func1, func2, serviceKey);
             executedShadow = true;
         } else {
-            _weightCounter++;
+            weightCounter++;
             result = executeJustFunc1(func1);
             executedShadow = false;
         }

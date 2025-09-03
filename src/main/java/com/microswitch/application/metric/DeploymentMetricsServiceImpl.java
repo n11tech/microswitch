@@ -1,7 +1,6 @@
-package com.n11.development.core.service;
+package com.microswitch.application.metric;
 
-import com.n11.development.infrastructure.metrics.DeploymentMetrics;
-import com.n11.development.properties.MicroswitchProperties;
+import com.microswitch.domain.InitializerConfiguration;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -13,9 +12,9 @@ import java.util.Map;
 public class DeploymentMetricsServiceImpl implements DeploymentMetricsService {
     
     private final DeploymentMetrics deploymentMetrics;
-    private final MicroswitchProperties properties;
+    private final InitializerConfiguration properties;
     
-    public DeploymentMetricsServiceImpl(DeploymentMetrics deploymentMetrics, MicroswitchProperties properties) {
+    public DeploymentMetricsServiceImpl(DeploymentMetrics deploymentMetrics, InitializerConfiguration properties) {
         this.deploymentMetrics = deploymentMetrics;
         this.properties = properties;
     }

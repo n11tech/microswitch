@@ -1,4 +1,4 @@
-package com.n11.development.infrastructure.deployment;
+package com.microswitch.infrastructure.deployment;
 
 import lombok.Builder;
 import lombok.Data;
@@ -19,6 +19,4 @@ public class DeploymentContext<R> {
     private Supplier<R> experimentalMethod;
 
     private Instant startTime;
-
-
 }

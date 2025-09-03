@@ -1,7 +1,7 @@
-package com.n11.development.properties;
+package com.microswitch.domain;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.n11.development.core.strategy.AlgorithmType;
+import com.microswitch.domain.strategy.AlgorithmType;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -12,7 +12,7 @@ import java.util.Map;
 @Setter
 @ConfigurationProperties(prefix = "microswitch")
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class MicroswitchProperties {
+public class InitializerConfiguration {
 
     private boolean enabled = true;
     private Map<String, ServiceConfig> services;

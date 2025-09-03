@@ -1,6 +1,6 @@
-package com.n11.development.actuator;
+package com.microswitch.infrastructure.external;
 
-import com.n11.development.core.service.DeploymentMetricsService;
+import com.microswitch.application.metric.DeploymentMetricsService;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
 import org.springframework.stereotype.Component;

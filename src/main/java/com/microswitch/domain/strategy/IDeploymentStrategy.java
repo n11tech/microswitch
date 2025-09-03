@@ -1,4 +1,4 @@
-package com.n11.development.core.strategy;
+package com.microswitch.domain.strategy;
 
 import java.util.function.Supplier;
 
