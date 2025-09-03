@@ -1,18 +1,18 @@
-package com.n11.development.core.strategy;
+package com.microswitch.domain.strategy;
 
-import com.n11.development.infrastructure.metrics.DeploymentMetrics;
-import com.n11.development.properties.MicroswitchProperties;
+import com.microswitch.application.metric.DeploymentMetrics;
+import com.microswitch.domain.InitializerConfiguration;
 import org.springframework.stereotype.Component;
 
 @Component
 public class DefaultDeploymentStrategyFactory extends DeploymentStrategyFactory {
     
-    public DefaultDeploymentStrategyFactory(MicroswitchProperties properties, DeploymentMetrics deploymentMetrics) {
+    public DefaultDeploymentStrategyFactory(InitializerConfiguration properties, DeploymentMetrics deploymentMetrics) {
         super(properties, deploymentMetrics);
     }
     
     @Override
-    protected void initializeStrategies(MicroswitchProperties properties, DeploymentMetrics deploymentMetrics) {
+    protected void initializeStrategies(InitializerConfiguration properties, DeploymentMetrics deploymentMetrics) {
 
         addStrategy(StrategyType.CANARY, new Canary(properties, deploymentMetrics));
 

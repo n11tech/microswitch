@@ -1,5 +1,6 @@
-package com.n11.development.core.strategy;
+package com.microswitch.domain;
 
+import com.microswitch.domain.strategy.DeploymentStrategyFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -26,7 +27,5 @@ public class DeploymentManager {
     public <R> R blueGreen(Supplier<R> stable, Supplier<R> experimental, String serviceKey) {
         return strategyFactory.executeBlueGreen(stable, experimental, serviceKey);
     }
-    
-
 }
 

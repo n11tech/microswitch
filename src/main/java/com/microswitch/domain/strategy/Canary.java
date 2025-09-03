@@ -1,7 +1,7 @@
-package com.n11.development.core.strategy;
+package com.microswitch.domain.strategy;
 
-import com.n11.development.infrastructure.metrics.DeploymentMetrics;
-import com.n11.development.properties.MicroswitchProperties;
+import com.microswitch.application.metric.DeploymentMetrics;
+import com.microswitch.domain.InitializerConfiguration;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -15,7 +15,7 @@ public class Canary extends DeployTemplate implements IDeploymentStrategy {
     private int totalCalls = 10;
     private UniqueRandomGenerator uniqueRandomGenerator = new UniqueRandomGenerator(totalCalls);
 
-    protected Canary(MicroswitchProperties properties, DeploymentMetrics deploymentMetrics) {
+    protected Canary(InitializerConfiguration properties, DeploymentMetrics deploymentMetrics) {
         super(properties, deploymentMetrics);
     }
 
@@ -60,7 +60,7 @@ public class Canary extends DeployTemplate implements IDeploymentStrategy {
         return result;
     }
 
-    private int getCallsForFunc1Method(MicroswitchProperties.Canary canaryConfig) {
+    private int getCallsForFunc1Method(InitializerConfiguration.Canary canaryConfig) {
         var primaryPercentage = canaryConfig.getPrimaryPercentage() == null ? 100 : canaryConfig.getPrimaryPercentage();
         
         if (primaryPercentage < 0 || primaryPercentage > 100) {

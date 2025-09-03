@@ -1,9 +1,7 @@
-package com.n11.development.infrastructure.deployment;
+package com.microswitch.infrastructure.deployment;
 
-import com.n11.development.core.strategy.DeploymentManager;
-import com.n11.development.properties.MicroswitchProperties;
+import com.microswitch.domain.DeploymentManager;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -13,8 +11,6 @@ import java.time.Instant;
 public class DeploymentExecutor {
 
     private final DeploymentManager deploymentManager;
-
-    @Autowired
     public DeploymentExecutor(DeploymentManager deploymentManager) {
         this.deploymentManager = deploymentManager;
     }
@@ -71,18 +67,18 @@ public class DeploymentExecutor {
         log.debug("Executing strategy: {} for service: {}", strategyName, serviceKey);
         
         try {
-            switch (strategyName.toLowerCase()) {
-                case "canary":
-                    return deploymentManager.canary(context.getStableMethod(), context.getExperimentalMethod(), serviceKey);
-                case "shadow":
-                    return deploymentManager.shadow(context.getStableMethod(), context.getExperimentalMethod(), serviceKey);
-                case "blue-green":
-                case "bluegreen":
-                    return deploymentManager.blueGreen(context.getStableMethod(), context.getExperimentalMethod(), serviceKey);
-                default:
+            return switch (strategyName.toLowerCase()) {
+                case "canary" ->
+                        deploymentManager.canary(context.getStableMethod(), context.getExperimentalMethod(), serviceKey);
+                case "shadow" ->
+                        deploymentManager.shadow(context.getStableMethod(), context.getExperimentalMethod(), serviceKey);
+                case "blue-green", "bluegreen" ->
+                        deploymentManager.blueGreen(context.getStableMethod(), context.getExperimentalMethod(), serviceKey);
+                default -> {
                     log.warn("Unknown strategy: {}, falling back to stable method", strategyName);
-                    return context.getStableMethod().get();
-            }
+                    yield context.getStableMethod().get();
+                }
+            };
         } catch (Exception e) {
             log.error("Strategy execution failed for service: {}, strategy: {}", serviceKey, strategyName, e);
             log.warn("Falling back to stable method");

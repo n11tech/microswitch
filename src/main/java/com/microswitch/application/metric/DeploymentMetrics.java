@@ -1,4 +1,4 @@
-package com.n11.development.infrastructure.metrics;
+package com.microswitch.application.metric;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -14,7 +14,7 @@ public class DeploymentMetrics {
     private final MeterRegistry meterRegistry;
     private final ConcurrentHashMap<String, Counter> successCounters = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Counter> errorCounters = new ConcurrentHashMap<>();
-    
+
     public DeploymentMetrics(MeterRegistry meterRegistry) {
         this.meterRegistry = meterRegistry;
     }

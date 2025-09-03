@@ -1,7 +1,7 @@
-package com.n11.development.core.strategy;
+package com.microswitch.domain.strategy;
 
-import com.n11.development.infrastructure.metrics.DeploymentMetrics;
-import com.n11.development.properties.MicroswitchProperties;
+import com.microswitch.application.metric.DeploymentMetrics;
+import com.microswitch.domain.InitializerConfiguration;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -10,7 +10,7 @@ import java.util.function.Supplier;
 public class BlueGreen extends DeployTemplate implements IDeploymentStrategy {
     private final Instant startTime = Instant.now();
 
-    protected BlueGreen(MicroswitchProperties properties, DeploymentMetrics deploymentMetrics) {
+    protected BlueGreen(InitializerConfiguration properties, DeploymentMetrics deploymentMetrics) {
         super(properties, deploymentMetrics);
     }
 
