@@ -2,12 +2,15 @@ package com.microswitch.domain.strategy;
 
 import com.microswitch.application.metric.DeploymentMetrics;
 import com.microswitch.domain.InitializerConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.function.Supplier;
 
-public class BlueGreen extends DeployTemplate implements IDeploymentStrategy {
+public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
+    private static final Logger log = LoggerFactory.getLogger(BlueGreen.class);
     private final Instant startTime = Instant.now();
 
     protected BlueGreen(InitializerConfiguration properties, DeploymentMetrics deploymentMetrics) {
@@ -15,20 +18,23 @@ public class BlueGreen extends DeployTemplate implements IDeploymentStrategy {
     }
 
     @Override
-    public <R> R execute(Supplier<R> func1, Supplier<R> func2, String serviceKey) {
+    public <R> R execute(Supplier<R> primary, Supplier<R> secondary, String serviceKey) {
+        if (serviceKey == null || serviceKey.trim().isEmpty()) {
+            throw new IllegalArgumentException("Service key cannot be null or empty");
+        }
         var serviceConfig = properties.getServices().get(serviceKey);
         if (serviceConfig == null || !serviceConfig.isEnabled()) {
-            return func1.get();
+            return primary.get();
         }
 
         var blueGreenConfig = serviceConfig.getBlueGreen();
         if (blueGreenConfig == null) {
-            return func1.get();
+            return primary.get();
         }
 
         var primaryPercentage = blueGreenConfig.getPrimaryPercentage();
         if (primaryPercentage == null) {
-            return func1.get();
+            return primary.get();
         }
 
         if (primaryPercentage < 0 || primaryPercentage > 100)
@@ -41,20 +47,20 @@ public class BlueGreen extends DeployTemplate implements IDeploymentStrategy {
         
         if (ttl != null && ttl > 0) {
             if (Duration.between(startTime, Instant.now()).toSeconds() < ttl) {
-                var calculationResult = calculateResultWithMetrics(func1, func2, primaryPercentage);
+                var calculationResult = calculateResultWithMetrics(primary, secondary, primaryPercentage);
                 result = calculationResult.result;
                 usedExperimental = calculationResult.usedExperimental;
             } else {
-                result = func2.get();
+                result = secondary.get();
                 usedExperimental = true;
             }
         } else {
-            var calculationResult = calculateResultWithMetrics(func1, func2, primaryPercentage);
+            var calculationResult = calculateResultWithMetrics(primary, secondary, primaryPercentage);
             result = calculationResult.result;
             usedExperimental = calculationResult.usedExperimental;
         }
 
-        // Metrics kaydet
+        // Record metrics with proper error handling
         try {
             if (usedExperimental) {
                 deploymentMetrics.recordSuccess(serviceKey, "experimental", "bluegreen");
@@ -62,23 +68,23 @@ public class BlueGreen extends DeployTemplate implements IDeploymentStrategy {
                 deploymentMetrics.recordSuccess(serviceKey, "stable", "bluegreen");
             }
         } catch (Exception e) {
-            // intentionally no-op
+            log.warn("Failed to record metrics for service: {} with strategy: bluegreen", serviceKey, e);
         }
 
         return result;
     }
     
-    private <R> CalculationResult<R> calculateResultWithMetrics(Supplier<R> func1, Supplier<R> func2, int primaryPercentage) {
+    private <R> CalculationResult<R> calculateResultWithMetrics(Supplier<R> primary, Supplier<R> secondary, int primaryPercentage) {
         if (primaryPercentage == 100) {
-            return new CalculationResult<>(func1.get(), false);
+            return new CalculationResult<>(primary.get(), false);
         } else if (primaryPercentage == 0) {
-            return new CalculationResult<>(func2.get(), true);
+            return new CalculationResult<>(secondary.get(), true);
         } else {
             double random = Math.random() * 100;
             if (random < primaryPercentage) {
-                return new CalculationResult<>(func1.get(), false);
+                return new CalculationResult<>(primary.get(), false);
             } else {
-                return new CalculationResult<>(func2.get(), true);
+                return new CalculationResult<>(secondary.get(), true);
             }
         }
     }

@@ -2,33 +2,41 @@ package com.microswitch.domain.strategy;
 
 import com.microswitch.application.metric.DeploymentMetrics;
 import com.microswitch.domain.InitializerConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
-public class Canary extends DeployTemplate implements IDeploymentStrategy {
-    private int counter = 0;
-    private int totalCalls = 10;
-    private UniqueRandomGenerator uniqueRandomGenerator = new UniqueRandomGenerator(totalCalls);
+public class Canary extends DeployTemplate implements DeploymentStrategy {
+    private static final Logger log = LoggerFactory.getLogger(Canary.class);
+    
+    private final AtomicInteger counter = new AtomicInteger(0);
+    private volatile int totalCalls = 10;
+    private volatile UniqueRandomGenerator uniqueRandomGenerator = new UniqueRandomGenerator(totalCalls);
 
     protected Canary(InitializerConfiguration properties, DeploymentMetrics deploymentMetrics) {
         super(properties, deploymentMetrics);
     }
 
     @Override
-    public <R> R execute(Supplier<R> func1, Supplier<R> func2, String serviceKey) {
+    public <R> R execute(Supplier<R> primary, Supplier<R> secondary, String serviceKey) {
+        if (serviceKey == null || serviceKey.trim().isEmpty()) {
+            throw new IllegalArgumentException("Service key cannot be null or empty");
+        }
         var serviceConfig = properties.getServices().get(serviceKey);
         if (serviceConfig == null || !serviceConfig.isEnabled()) {
-            return func1.get();
+            return primary.get();
         }
         
         var canaryConfig = serviceConfig.getCanary();
         if (canaryConfig == null) {
-            return func1.get();
+            return primary.get();
         }
 
         int callsForFunc1Method = getCallsForFunc1Method(canaryConfig);
@@ -37,16 +45,16 @@ public class Canary extends DeployTemplate implements IDeploymentStrategy {
         boolean usedExperimental;
         R result;
         if (Objects.equals(algorithm, AlgorithmType.RANDOM.getValue())) {
-            var executionResult = executeRandomWithMetrics(func1, func2, callsForFunc1Method);
+            var executionResult = executeRandomWithMetrics(primary, secondary, callsForFunc1Method);
             result = executionResult.result;
             usedExperimental = executionResult.usedExperimental;
         } else {
-            var executionResult = executeSequenceWithMetrics(func1, func2, callsForFunc1Method);
+            var executionResult = executeSequenceWithMetrics(primary, secondary, callsForFunc1Method);
             result = executionResult.result;
             usedExperimental = executionResult.usedExperimental;
         }
 
-        // Metrics kaydet
+        // Record metrics with proper error handling
         try {
             if (usedExperimental) {
                 deploymentMetrics.recordSuccess(serviceKey, "experimental", "canary");
@@ -54,7 +62,7 @@ public class Canary extends DeployTemplate implements IDeploymentStrategy {
                 deploymentMetrics.recordSuccess(serviceKey, "stable", "canary");
             }
         } catch (Exception e) {
-            // intentionally no-op
+            log.warn("Failed to record metrics for service: {} with strategy: canary", serviceKey, e);
         }
 
         return result;
@@ -74,23 +82,26 @@ public class Canary extends DeployTemplate implements IDeploymentStrategy {
         return (totalCalls * func1Percentage) / 100;
     }
     
-    private <R> ExecutionResult<R> executeSequenceWithMetrics(Supplier<R> func1, Supplier<R> func2, int callsForFunc1Method) {
-        counter = (counter + 1) % totalCalls;
-        if (counter < callsForFunc1Method) {
-            return new ExecutionResult<>(func1.get(), false);
+    private <R> ExecutionResult<R> executeSequenceWithMetrics(Supplier<R> primary, Supplier<R> secondary, int callsForFunc1Method) {
+        int currentCount = counter.getAndUpdate(c -> (c + 1) % totalCalls);
+        if (currentCount < callsForFunc1Method) {
+            return new ExecutionResult<>(primary.get(), false);
         } else {
-            return new ExecutionResult<>(func2.get(), true);
+            return new ExecutionResult<>(secondary.get(), true);
         }
     }
 
-    private <R> ExecutionResult<R> executeRandomWithMetrics(Supplier<R> func1, Supplier<R> func2, int callsForFunc1Method) {
-        if (uniqueRandomGenerator.getUniqueValues().size() != totalCalls)
-            uniqueRandomGenerator = new UniqueRandomGenerator(totalCalls);
+    private <R> ExecutionResult<R> executeRandomWithMetrics(Supplier<R> primary, Supplier<R> secondary, int callsForFunc1Method) {
+        synchronized (this) {
+            if (uniqueRandomGenerator.getUniqueValues().size() != totalCalls) {
+                uniqueRandomGenerator = new UniqueRandomGenerator(totalCalls);
+            }
+        }
         
         if (uniqueRandomGenerator.getNextUniqueRandomValue() < callsForFunc1Method) {
-            return new ExecutionResult<>(func1.get(), false);
+            return new ExecutionResult<>(primary.get(), false);
         } else {
-            return new ExecutionResult<>(func2.get(), true);
+            return new ExecutionResult<>(secondary.get(), true);
         }
     }
 

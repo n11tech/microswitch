@@ -2,14 +2,15 @@ package com.microswitch.domain.strategy;
 
 import com.microswitch.application.metric.DeploymentMetrics;
 import com.microswitch.domain.InitializerConfiguration;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
-@Slf4j
-public class Shadow extends DeployTemplate implements IDeploymentStrategy {
+public class Shadow extends DeployTemplate implements DeploymentStrategy {
+    private static final Logger log = LoggerFactory.getLogger(Shadow.class);
     private static final byte DEFAULT_SHADOW_WEIGH = 1;
     private static Short weightCounter = (int) DEFAULT_SHADOW_WEIGH;
 
@@ -18,15 +19,18 @@ public class Shadow extends DeployTemplate implements IDeploymentStrategy {
     }
 
     @Override
-    public <R> R execute(Supplier<R> func1, Supplier<R> func2, String serviceKey) {
+    public <R> R execute(Supplier<R> primary, Supplier<R> secondary, String serviceKey) {
+        if (serviceKey == null || serviceKey.trim().isEmpty()) {
+            throw new IllegalArgumentException("Service key cannot be null or empty");
+        }
         var serviceConfig = properties.getServices().get(serviceKey);
         if (serviceConfig == null || !serviceConfig.isEnabled()) {
-            return func1.get();
+            return primary.get();
         }
         
         var shadowConfig = serviceConfig.getShadow();
         if (shadowConfig == null || shadowConfig.getWeight() == null || shadowConfig.getWeight() <= 0) {
-            return func1.get();
+            return primary.get();
         }
 
         var weight = shadowConfig.getWeight();
@@ -36,35 +40,34 @@ public class Shadow extends DeployTemplate implements IDeploymentStrategy {
 
         if (weight >= DEFAULT_SHADOW_WEIGH && weight.equals(weightCounter)) {
             weightCounter = (int) DEFAULT_SHADOW_WEIGH;
-            result = executeAsyncSimultaneously(func1, func2, serviceKey);
+            result = executeAsyncSimultaneously(primary, secondary, serviceKey);
             executedShadow = true;
         } else {
             weightCounter++;
-            result = executeJustFunc1(func1);
+            result = executeJustFunc1(primary);
             executedShadow = false;
         }
 
-        // Metrics kaydet - Shadow her zaman stable döner ama shadow execution yapar
+        // Record metrics with proper error handling
         try {
             deploymentMetrics.recordSuccess(serviceKey, "stable", "shadow");
             if (executedShadow) {
-                // Shadow execution yapıldığını kaydet
                 deploymentMetrics.recordSuccess(serviceKey, "shadow_execution", "shadow");
             }
         } catch (Exception e) {
-            // intentionally no-op
+            log.warn("Failed to record metrics for service: {} with strategy: shadow", serviceKey, e);
         }
 
         return result;
     }
 
-    private static <R> R executeJustFunc1(Supplier<R> func1) {
-        return func1.get();
+    private static <R> R executeJustFunc1(Supplier<R> primary) {
+        return primary.get();
     }
 
-    private <R> R executeAsyncSimultaneously(Supplier<R> func1, Supplier<R> func2, String serviceKey) {
-        var futureFunc1 = CompletableFuture.supplyAsync(func1);
-        var futureFunc2 = CompletableFuture.supplyAsync(func2);
+    private <R> R executeAsyncSimultaneously(Supplier<R> primary, Supplier<R> secondary, String serviceKey) {
+        var futureFunc1 = CompletableFuture.supplyAsync(primary);
+        var futureFunc2 = CompletableFuture.supplyAsync(secondary);
         CompletableFuture.allOf(futureFunc1, futureFunc2).join();
 
         R result1 = futureFunc1.join();
