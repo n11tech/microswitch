@@ -13,18 +13,16 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
     private static final byte DEFAULT_SHADOW_WEIGH = 1;
     private Short weightCounter = (short) DEFAULT_SHADOW_WEIGH;
 
-    protected Shadow(InitializerConfiguration properties) {
+    public Shadow(InitializerConfiguration properties) {
         super(properties);
     }
 
     @Override
     public <R> R execute(Supplier<R> primary, Supplier<R> secondary, String serviceKey) {
-        if (serviceKey == null || serviceKey.trim().isEmpty()) {
-            throw new IllegalArgumentException("Service key cannot be null or empty");
-        }
-        var serviceConfig = properties.getServices().get(serviceKey);
-        if (serviceConfig == null || !serviceConfig.isEnabled()) {
-            return primary.get();
+        var serviceConfig = validateServiceAndGetConfig(serviceKey, primary);
+        var primaryResult = executeIfServiceInvalid(serviceConfig, primary);
+        if (primaryResult != null) {
+            return primaryResult;
         }
 
         var shadowConfig = serviceConfig.getShadow();

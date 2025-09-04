@@ -12,6 +12,4 @@ public enum AlgorithmType {
     AlgorithmType(String value) {
         this.value = value;
     }
-
-
 }

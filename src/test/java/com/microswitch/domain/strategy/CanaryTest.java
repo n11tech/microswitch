@@ -28,7 +28,7 @@ class CanaryTest {
     @BeforeEach
     void setUp() {
         properties = new InitializerConfiguration();
-        Map<String, InitializerConfiguration.ServiceConfig> services = new HashMap<>();
+        Map<String, InitializerConfiguration.DeployableServices> services = new HashMap<>();
         properties.setServices(services);
         canaryStrategy = new Canary(properties);
     }
@@ -74,9 +74,9 @@ class CanaryTest {
     void testExecuteWithEnabledServiceButNoCanaryConfig() {
         // Given
         String serviceKey = "test-service";
-        InitializerConfiguration.ServiceConfig serviceConfig = new InitializerConfiguration.ServiceConfig();
-        serviceConfig.setEnabled(true);
-        properties.getServices().put(serviceKey, serviceConfig);
+        InitializerConfiguration.DeployableServices deployableServices = new InitializerConfiguration.DeployableServices();
+        deployableServices.setEnabled(true);
+        properties.getServices().put(serviceKey, deployableServices);
 
         Supplier<String> primary = () -> "primary";
         Supplier<String> secondary = () -> "secondary";
@@ -92,15 +92,15 @@ class CanaryTest {
     void testExecuteWithCanaryConfiguration() {
         // Given
         String serviceKey = "test-service";
-        InitializerConfiguration.ServiceConfig serviceConfig = new InitializerConfiguration.ServiceConfig();
-        serviceConfig.setEnabled(true);
+        InitializerConfiguration.DeployableServices deployableServices = new InitializerConfiguration.DeployableServices();
+        deployableServices.setEnabled(true);
         
         InitializerConfiguration.Canary canaryConfig = new InitializerConfiguration.Canary();
         canaryConfig.setPrimaryPercentage(80);
         canaryConfig.setAlgorithm("sequence");
-        serviceConfig.setCanary(canaryConfig);
+        deployableServices.setCanary(canaryConfig);
         
-        properties.getServices().put(serviceKey, serviceConfig);
+        properties.getServices().put(serviceKey, deployableServices);
 
         Supplier<String> primary = () -> "primary";
         Supplier<String> secondary = () -> "secondary";
@@ -118,14 +118,14 @@ class CanaryTest {
     void testInvalidPrimaryPercentage() {
         // Given
         String serviceKey = "test-service";
-        InitializerConfiguration.ServiceConfig serviceConfig = new InitializerConfiguration.ServiceConfig();
-        serviceConfig.setEnabled(true);
+        InitializerConfiguration.DeployableServices deployableServices = new InitializerConfiguration.DeployableServices();
+        deployableServices.setEnabled(true);
         
         InitializerConfiguration.Canary canaryConfig = new InitializerConfiguration.Canary();
         canaryConfig.setPrimaryPercentage(150); // Invalid percentage
-        serviceConfig.setCanary(canaryConfig);
+        deployableServices.setCanary(canaryConfig);
         
-        properties.getServices().put(serviceKey, serviceConfig);
+        properties.getServices().put(serviceKey, deployableServices);
 
         Supplier<String> primary = () -> "primary";
         Supplier<String> secondary = () -> "secondary";
@@ -139,14 +139,14 @@ class CanaryTest {
     void testMetricsRecordingFailure() {
         // Given
         String serviceKey = "test-service";
-        InitializerConfiguration.ServiceConfig serviceConfig = new InitializerConfiguration.ServiceConfig();
-        serviceConfig.setEnabled(true);
+        InitializerConfiguration.DeployableServices deployableServices = new InitializerConfiguration.DeployableServices();
+        deployableServices.setEnabled(true);
         
         InitializerConfiguration.Canary canaryConfig = new InitializerConfiguration.Canary();
         canaryConfig.setPrimaryPercentage(100); // Always primary
-        serviceConfig.setCanary(canaryConfig);
+        deployableServices.setCanary(canaryConfig);
         
-        properties.getServices().put(serviceKey, serviceConfig);
+        properties.getServices().put(serviceKey, deployableServices);
 
         doThrow(new RuntimeException("Metrics failure"))
             .when(deploymentMetrics).recordSuccess(anyString(), anyString(), anyString());

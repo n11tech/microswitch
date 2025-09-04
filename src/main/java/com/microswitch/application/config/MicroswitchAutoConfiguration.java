@@ -1,14 +1,17 @@
-package com.microswitch.config;
+package com.microswitch.application.config;
 
 import com.microswitch.application.metric.DeploymentMetrics;
 import com.microswitch.infrastructure.manager.DeploymentManager;
 import com.microswitch.domain.InitializerConfiguration;
 import com.microswitch.application.executor.DeploymentStrategyExecutor;
+import com.microswitch.application.executor.MicroswitchDeploymentStrategyExecutor;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 
 /**
@@ -30,6 +33,20 @@ import org.springframework.context.annotation.Bean;
 public class MicroswitchAutoConfiguration {
 
     /**
+     * Creates the DeploymentStrategyExecutor bean if none exists.
+     *
+     * @param properties the microswitch configuration properties
+     * @param deploymentMetrics the deployment metrics service (optional)
+     * @return configured deployment strategy executor
+     */
+    @Bean
+    @ConditionalOnMissingBean(DeploymentStrategyExecutor.class)
+    public DeploymentStrategyExecutor deploymentStrategyExecutor(InitializerConfiguration properties, 
+                                                                @Autowired(required = false) DeploymentMetrics deploymentMetrics) {
+        return new MicroswitchDeploymentStrategyExecutor(properties, deploymentMetrics);
+    }
+
+    /**
      * Creates the DeploymentManager bean if none exists.
      *
      * @param strategyFactory the deployment strategy factory
@@ -49,6 +66,7 @@ public class MicroswitchAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(DeploymentMetrics.class)
+    @ConditionalOnBean(MeterRegistry.class)
     public DeploymentMetrics deploymentMetrics(MeterRegistry meterRegistry) {
         return new DeploymentMetrics(meterRegistry);
     }

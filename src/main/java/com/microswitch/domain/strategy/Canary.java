@@ -20,18 +20,16 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
     private record ExecutionResult<R>(R result, boolean usedExperimental) {
     }
 
-    protected Canary(InitializerConfiguration properties) {
+    public Canary(InitializerConfiguration properties) {
         super(properties);
     }
 
     @Override
     public <R> R execute(Supplier<R> primary, Supplier<R> secondary, String serviceKey) {
-        if (serviceKey == null || serviceKey.trim().isEmpty()) {
-            throw new IllegalArgumentException("Service key cannot be null or empty");
-        }
-        var serviceConfig = properties.getServices().get(serviceKey);
-        if (serviceConfig == null || !serviceConfig.isEnabled()) {
-            return primary.get();
+        var serviceConfig = validateServiceAndGetConfig(serviceKey, primary);
+        var primaryResult = executeIfServiceInvalid(serviceConfig, primary);
+        if (primaryResult != null) {
+            return primaryResult;
         }
 
         var canaryConfig = serviceConfig.getCanary();
@@ -39,17 +37,17 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
             return primary.get();
         }
 
-        int callsForFunc1Method = getCallsForFunc1Method(canaryConfig);
+        int callsForFunc1Method = getCallsForPrimaryMethod(canaryConfig);
         var algorithm = canaryConfig.getAlgorithm();
 
-        if (Objects.equals(algorithm, AlgorithmType.RANDOM.getValue())) {
+        if (Objects.equals(algorithm.toLowerCase(), AlgorithmType.RANDOM.getValue())) {
             return executeRandom(primary, secondary, callsForFunc1Method).result;
         } else {
             return executeSequence(primary, secondary, callsForFunc1Method).result;
         }
     }
 
-    private int getCallsForFunc1Method(InitializerConfiguration.Canary canaryConfig) {
+    private int getCallsForPrimaryMethod(InitializerConfiguration.Canary canaryConfig) {
         var primaryPercentage = canaryConfig.getPrimaryPercentage() == null ? 100 : canaryConfig.getPrimaryPercentage();
 
         if (primaryPercentage < 0 || primaryPercentage > 100) {

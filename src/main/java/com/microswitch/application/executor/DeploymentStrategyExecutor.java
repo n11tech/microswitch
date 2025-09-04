@@ -29,7 +29,7 @@ public class DeploymentStrategyExecutor {
      */
     public DeploymentStrategyExecutor(InitializerConfiguration properties, DeploymentMetrics deploymentMetrics) {
         initializeStrategies(Objects.requireNonNull(properties, "properties must not be null"),
-                Objects.requireNonNull(deploymentMetrics, "deploymentMetrics must not be null"));
+                deploymentMetrics); // deploymentMetrics can be null if MeterRegistry is not available
     }
 
     /**
