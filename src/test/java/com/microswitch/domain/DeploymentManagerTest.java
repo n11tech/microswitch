@@ -3,7 +3,7 @@ package com.microswitch.domain;
 import com.microswitch.application.metric.DeploymentMetrics;
 import com.microswitch.application.executor.DeploymentStrategy;
 import com.microswitch.application.executor.DeploymentStrategyExecutor;
-import com.microswitch.domain.strategy.*;
+import com.microswitch.domain.value.StrategyType;
 import com.microswitch.infrastructure.manager.DeploymentManager;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;

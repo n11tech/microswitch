@@ -30,7 +30,7 @@ class CanaryTest {
         properties = new InitializerConfiguration();
         Map<String, InitializerConfiguration.ServiceConfig> services = new HashMap<>();
         properties.setServices(services);
-        canaryStrategy = new Canary(properties, deploymentMetrics);
+        canaryStrategy = new Canary(properties);
     }
 
     @Test
