@@ -1,12 +1,15 @@
 package com.microswitch.application.random;
 
+import lombok.Getter;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
-public static class UniqueRandomGenerator {
-    private final List<Integer> uniqueValues;
+@Getter
+public class UniqueRandomGenerator {
+    public final List<Integer> uniqueValues;
     private int index = 0;
 
     public UniqueRandomGenerator(int range) {
@@ -15,10 +18,6 @@ public static class UniqueRandomGenerator {
             uniqueValues.add(i);
         }
         shuffleValues();
-    }
-
-    public List<Integer> getUniqueValues() {
-        return uniqueValues;
     }
 
     public int getNextUniqueRandomValue() {
