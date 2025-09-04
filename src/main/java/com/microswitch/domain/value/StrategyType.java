@@ -1,4 +1,4 @@
-package com.microswitch.domain.strategy;
+package com.microswitch.domain.value;
 
 import lombok.Getter;
 

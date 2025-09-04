@@ -2,7 +2,7 @@ package com.microswitch.application.executor;
 
 import com.microswitch.application.metric.DeploymentMetrics;
 import com.microswitch.domain.InitializerConfiguration;
-import com.microswitch.domain.strategy.StrategyType;
+import com.microswitch.domain.value.StrategyType;
 
 import java.util.EnumMap;
 import java.util.Map;

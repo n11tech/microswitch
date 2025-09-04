@@ -1,18 +1,19 @@
 package com.microswitch.domain.strategy;
 
-import com.microswitch.application.metric.DeploymentMetrics;
 import com.microswitch.application.executor.DeploymentStrategy;
 import com.microswitch.domain.InitializerConfiguration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.function.Supplier;
 
+@Slf4j
 public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
-    private static final Logger log = LoggerFactory.getLogger(BlueGreen.class);
     private final Instant startTime = Instant.now();
+
+    private record CalculationResult<R>(R result, boolean usedExperimental) {
+    }
 
     protected BlueGreen(InitializerConfiguration properties) {
         super(properties);
@@ -42,61 +43,31 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
             throw new IllegalArgumentException("Stable percentage must be between 0 and 100.");
 
         var ttl = blueGreenConfig.getTtl();
-
-        R result;
-        boolean usedExperimental = false;
-
         if (ttl != null && ttl > 0) {
             if (Duration.between(startTime, Instant.now()).toSeconds() < ttl) {
-                var calculationResult = calculateResultWithMetrics(primary, secondary, primaryPercentage);
-                result = calculationResult.result;
-                usedExperimental = calculationResult.usedExperimental;
+                return calculateResult(primary, secondary, primaryPercentage).result;
             } else {
-                result = secondary.get();
-                usedExperimental = true;
+                return secondary.get();
             }
         } else {
-            var calculationResult = calculateResultWithMetrics(primary, secondary, primaryPercentage);
-            result = calculationResult.result;
-            usedExperimental = calculationResult.usedExperimental;
+            return calculateResult(primary, secondary, primaryPercentage).result;
         }
-
-        // Record metrics with proper error handling
-        try {
-            if (usedExperimental) {
-                deploymentMetrics.recordSuccess(serviceKey, "experimental", "bluegreen");
-            } else {
-                deploymentMetrics.recordSuccess(serviceKey, "stable", "bluegreen");
-            }
-        } catch (Exception e) {
-            log.warn("Failed to record metrics for service: {} with strategy: bluegreen", serviceKey, e);
-        }
-
-        return result;
     }
 
-    private <R> CalculationResult<R> calculateResultWithMetrics(Supplier<R> primary, Supplier<R> secondary, int primaryPercentage) {
-        if (primaryPercentage == 100) {
-            return new CalculationResult<>(primary.get(), false);
-        } else if (primaryPercentage == 0) {
-            return new CalculationResult<>(secondary.get(), true);
-        } else {
-            double random = Math.random() * 100;
-            if (random < primaryPercentage) {
-                return new CalculationResult<>(primary.get(), false);
-            } else {
+    private <R> CalculationResult<R> calculateResult(Supplier<R> primary, Supplier<R> secondary, int primaryPercentage) {
+        if (primaryPercentage != 100) {
+            if (primaryPercentage == 0) {
                 return new CalculationResult<>(secondary.get(), true);
+            } else {
+                double random = Math.random() * 100;
+                if (random < primaryPercentage) {
+                    return new CalculationResult<>(primary.get(), false);
+                } else {
+                    return new CalculationResult<>(secondary.get(), true);
+                }
             }
-        }
-    }
-
-    private static class CalculationResult<R> {
-        final R result;
-        final boolean usedExperimental;
-
-        CalculationResult(R result, boolean usedExperimental) {
-            this.result = result;
-            this.usedExperimental = usedExperimental;
+        } else {
+            return new CalculationResult<>(primary.get(), false);
         }
     }
 }

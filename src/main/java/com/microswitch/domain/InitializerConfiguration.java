@@ -1,7 +1,7 @@
 package com.microswitch.domain;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.microswitch.domain.strategy.AlgorithmType;
+import com.microswitch.domain.value.AlgorithmType;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;

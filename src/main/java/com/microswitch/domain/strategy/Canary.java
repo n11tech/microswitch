@@ -1,25 +1,24 @@
 package com.microswitch.domain.strategy;
 
-import com.microswitch.application.metric.DeploymentMetrics;
 import com.microswitch.application.executor.DeploymentStrategy;
+import com.microswitch.application.random.UniqueRandomGenerator;
 import com.microswitch.domain.InitializerConfiguration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.microswitch.domain.value.AlgorithmType;
+import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Objects;
-import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
+@Slf4j
 public class Canary extends DeployTemplate implements DeploymentStrategy {
-    private static final Logger log = LoggerFactory.getLogger(Canary.class);
 
     private final AtomicInteger counter = new AtomicInteger(0);
     private volatile int totalCalls = 10;
-    private volatile UniqueRandomGenerator uniqueRandomGenerator = new UniqueRandomGenerator(totalCalls);
+    private UniqueRandomGenerator uniqueRandomGenerator = new UniqueRandomGenerator(totalCalls);
+
+    private record ExecutionResult<R>(R result, boolean usedExperimental) {
+    }
 
     protected Canary(InitializerConfiguration properties) {
         super(properties);
@@ -44,9 +43,9 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
         var algorithm = canaryConfig.getAlgorithm();
 
         if (Objects.equals(algorithm, AlgorithmType.RANDOM.getValue())) {
-            return executeRandomWithMetrics(primary, secondary, callsForFunc1Method).result;
+            return executeRandom(primary, secondary, callsForFunc1Method).result;
         } else {
-            return executeSequenceWithMetrics(primary, secondary, callsForFunc1Method).result;
+            return executeSequence(primary, secondary, callsForFunc1Method).result;
         }
     }
 
@@ -63,7 +62,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
         return (totalCalls * primaryPercentage) / 100;
     }
 
-    private <R> ExecutionResult<R> executeSequenceWithMetrics(Supplier<R> primary, Supplier<R> secondary, int callsForFunc1Method) {
+    private <R> ExecutionResult<R> executeSequence(Supplier<R> primary, Supplier<R> secondary, int callsForFunc1Method) {
         int currentCount = counter.getAndUpdate(c -> (c + 1) % totalCalls);
         if (currentCount < callsForFunc1Method) {
             return new ExecutionResult<>(primary.get(), false);
@@ -72,14 +71,16 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
         }
     }
 
-    private <R> ExecutionResult<R> executeRandomWithMetrics(Supplier<R> primary, Supplier<R> secondary, int callsForFunc1Method) {
+    private <R> ExecutionResult<R> executeRandom(Supplier<R> primary, Supplier<R> secondary, int callsForFunc1Method) {
+        int randomValue;
         synchronized (this) {
             if (uniqueRandomGenerator.getUniqueValues().size() != totalCalls) {
                 uniqueRandomGenerator = new UniqueRandomGenerator(totalCalls);
             }
+            randomValue = uniqueRandomGenerator.getNextUniqueRandomValue();
         }
 
-        if (uniqueRandomGenerator.getNextUniqueRandomValue() < callsForFunc1Method) {
+        if (randomValue < callsForFunc1Method) {
             return new ExecutionResult<>(primary.get(), false);
         } else {
             return new ExecutionResult<>(secondary.get(), true);
@@ -88,15 +89,5 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
 
     private int gcd(int a, int b) {
         return b == 0 ? a : gcd(b, a % b);
-    }
-
-    private static class ExecutionResult<R> {
-        final R result;
-        final boolean usedExperimental;
-
-        ExecutionResult(R result, boolean usedExperimental) {
-            this.result = result;
-            this.usedExperimental = usedExperimental;
-        }
     }
 }
