@@ -1,7 +1,10 @@
 package com.microswitch.domain;
 
 import com.microswitch.application.metric.DeploymentMetrics;
+import com.microswitch.application.executor.DeploymentStrategy;
+import com.microswitch.application.executor.DeploymentStrategyExecutor;
 import com.microswitch.domain.strategy.*;
+import com.microswitch.infrastructure.external.DeploymentManager;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,7 +21,7 @@ class DeploymentManagerTest {
     @BeforeEach
     void setUp() {
         // Create simple test factory with test strategies
-        TestDeploymentStrategyFactory factory = new TestDeploymentStrategyFactory();
+        TestDeploymentStrategyExecutor factory = new TestDeploymentStrategyExecutor();
         deploymentManager = new DeploymentManager(factory);
     }
 
@@ -101,8 +104,8 @@ class DeploymentManagerTest {
         }
     }
 
-    static class TestDeploymentStrategyFactory extends DeploymentStrategyFactory {
-        public TestDeploymentStrategyFactory() {
+    static class TestDeploymentStrategyExecutor extends DeploymentStrategyExecutor {
+        public TestDeploymentStrategyExecutor() {
             super(new InitializerConfiguration(), 
                   new DeploymentMetrics(Mockito.mock(MeterRegistry.class)));
         }

@@ -1,6 +1,7 @@
 package com.microswitch.domain.strategy;
 
 import com.microswitch.application.metric.DeploymentMetrics;
+import com.microswitch.application.executor.DeploymentStrategy;
 import com.microswitch.domain.InitializerConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
