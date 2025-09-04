@@ -1,1 +1,1 @@
-com.microswitch.config.MicroswitchAutoConfiguration
+com.microswitch.application.config.MicroswitchAutoConfiguration

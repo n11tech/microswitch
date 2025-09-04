@@ -15,12 +15,12 @@ import java.util.Map;
 public class InitializerConfiguration {
 
     private boolean enabled = true;
-    private Map<String, ServiceConfig> services;
+    private Map<String, DeployableServices> services;
 
     @Getter
     @Setter
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    public static class ServiceConfig {
+    public static class DeployableServices {
         private boolean enabled = true;
         private Canary canary;
         private BlueGreen blueGreen;
@@ -32,7 +32,7 @@ public class InitializerConfiguration {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class Canary {
         private Integer primaryPercentage;
-        private String algorithm = AlgorithmType.SEQUENCE.getValue();
+        private String algorithm = AlgorithmType.SEQUENCE.getValue().toLowerCase();
     }
 
     @Getter
