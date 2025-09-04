@@ -1,7 +1,7 @@
 package com.microswitch.config;
 
 import com.microswitch.application.metric.DeploymentMetrics;
-import com.microswitch.infrastructure.external.DeploymentManager;
+import com.microswitch.infrastructure.manager.DeploymentManager;
 import com.microswitch.domain.InitializerConfiguration;
 import com.microswitch.application.executor.DeploymentStrategyExecutor;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;

@@ -14,8 +14,8 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
     private static final Logger log = LoggerFactory.getLogger(BlueGreen.class);
     private final Instant startTime = Instant.now();
 
-    protected BlueGreen(InitializerConfiguration properties, DeploymentMetrics deploymentMetrics) {
-        super(properties, deploymentMetrics);
+    protected BlueGreen(InitializerConfiguration properties) {
+        super(properties);
     }
 
     @Override
@@ -45,7 +45,7 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
 
         R result;
         boolean usedExperimental = false;
-        
+
         if (ttl != null && ttl > 0) {
             if (Duration.between(startTime, Instant.now()).toSeconds() < ttl) {
                 var calculationResult = calculateResultWithMetrics(primary, secondary, primaryPercentage);
@@ -74,7 +74,7 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
 
         return result;
     }
-    
+
     private <R> CalculationResult<R> calculateResultWithMetrics(Supplier<R> primary, Supplier<R> secondary, int primaryPercentage) {
         if (primaryPercentage == 100) {
             return new CalculationResult<>(primary.get(), false);
@@ -89,11 +89,11 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
             }
         }
     }
-    
+
     private static class CalculationResult<R> {
         final R result;
         final boolean usedExperimental;
-        
+
         CalculationResult(R result, boolean usedExperimental) {
             this.result = result;
             this.usedExperimental = usedExperimental;

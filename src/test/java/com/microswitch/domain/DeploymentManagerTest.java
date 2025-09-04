@@ -4,7 +4,7 @@ import com.microswitch.application.metric.DeploymentMetrics;
 import com.microswitch.application.executor.DeploymentStrategy;
 import com.microswitch.application.executor.DeploymentStrategyExecutor;
 import com.microswitch.domain.strategy.*;
-import com.microswitch.infrastructure.external.DeploymentManager;
+import com.microswitch.infrastructure.manager.DeploymentManager;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

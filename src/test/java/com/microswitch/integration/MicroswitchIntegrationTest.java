@@ -1,6 +1,6 @@
 package com.microswitch.integration;
 
-import com.microswitch.infrastructure.external.DeploymentManager;
+import com.microswitch.infrastructure.manager.DeploymentManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
