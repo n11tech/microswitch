@@ -15,10 +15,10 @@ import java.util.function.Supplier;
  * 
  * Traffic can be switched gradually or instantly between environments.
  */
-public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
+public class ImprovedBlueGreen extends DeployTemplate implements DeploymentStrategy {
     private final Instant startTime = Instant.now();
     
-    public BlueGreen(InitializerConfiguration properties) {
+    public ImprovedBlueGreen(InitializerConfiguration properties) {
         super(properties);
     }
 

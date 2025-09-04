@@ -39,7 +39,7 @@ public class InitializerConfiguration {
     @Setter
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class BlueGreen {
-        private Integer primaryPercentage;
+        private String weight;
         private Long ttl;
     }
 
