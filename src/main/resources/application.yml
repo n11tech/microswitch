@@ -20,7 +20,7 @@ microswitch:
         algorithm: SEQUENCE
       blueGreen:
         # Percentage of traffic for the primary (blue or green) environment.
-        primaryPercentage: 100
+        weight: 1/0
         # Time-to-live in milliseconds for session stickiness or route persistence (if applicable).
         ttl: 60000
       shadow:
