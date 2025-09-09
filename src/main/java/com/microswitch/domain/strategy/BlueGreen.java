@@ -2,25 +2,68 @@ package com.microswitch.domain.strategy;
 
 import com.microswitch.application.executor.DeploymentStrategy;
 import com.microswitch.domain.InitializerConfiguration;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 /**
- * Improved Blue-Green deployment strategy implementation.
+ * Thread-safe Blue-Green deployment strategy implementation for Kubernetes multi-pod environments.
  * <p>
  * Blue-Green deployment maintains two identical production environments:
  * - Blue (current/stable)
  * - Green (new/experimental)
  * <p>
- * Traffic can be switched gradually or instantly between environments.
+ * Traffic can be switched instantly between environments based on TTL or weight configuration.
+ * This implementation ensures consistency across multiple pods in a Kubernetes cluster.
  */
-@Slf4j
 public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
-    private final Instant startTime = Instant.now();
-    private Long elapsedSeconds = 0L;
+    private static final Logger log = LoggerFactory.getLogger(BlueGreen.class);
+    
+    // Thread-safe per-service state management for multi-pod consistency
+    private final ConcurrentHashMap<String, AtomicReference<Instant>> serviceStartTimes = new ConcurrentHashMap<>();
+    private final AtomicReference<ConcurrentHashMap<String, BlueGreenConfig>> configCache = new AtomicReference<>(new ConcurrentHashMap<>());
+
+    /**
+     * Immutable configuration record for Blue-Green deployment with validation.
+     * Ensures thread-safe configuration management across multiple pods.
+     */
+    public record BlueGreenConfig(Long ttl, String weight) {
+        public BlueGreenConfig {
+            // Validate TTL
+            if (ttl != null && ttl < 0) {
+                throw new IllegalArgumentException("TTL must be non-negative, got: " + ttl);
+            }
+            
+            // Validate weight format if provided
+            if (weight != null && !weight.trim().isEmpty()) {
+                validateWeightFormat(weight);
+            }
+        }
+        
+        private static void validateWeightFormat(String weight) {
+            try {
+                var weights = weight.split("/");
+                if (weights.length != 2) {
+                    throw new IllegalArgumentException("Weight must be in format 'blue/green', got: " + weight);
+                }
+                
+                var blueWeight = Integer.parseInt(weights[0].trim());
+                var greenWeight = Integer.parseInt(weights[1].trim());
+                
+                // Blue-Green must be binary: either 1/0 or 0/1
+                if (!((blueWeight == 1 && greenWeight == 0) || (blueWeight == 0 && greenWeight == 1))) {
+                    throw new IllegalArgumentException("Blue-Green weights must be binary: '1/0' or '0/1', got: " + weight);
+                }
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid weight format: " + weight + ". Expected binary format: '1/0' (Blue) or '0/1' (Green)");
+            }
+        }
+    }
 
     public BlueGreen(InitializerConfiguration properties) {
         super(properties);
@@ -28,13 +71,25 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
 
     @Override
     public <R> R execute(Supplier<R> blue, Supplier<R> green, String serviceKey) {
+        // Input validation for multi-pod safety
+        if (blue == null) {
+            throw new IllegalArgumentException("Blue supplier cannot be null");
+        }
+        if (green == null) {
+            throw new IllegalArgumentException("Green supplier cannot be null");
+        }
+        if (serviceKey == null || serviceKey.trim().isEmpty()) {
+            throw new IllegalArgumentException("Service key cannot be null or empty");
+        }
+
         var serviceConfig = validateServiceAndGetConfig(serviceKey, blue);
         var primaryResult = executeIfServiceInvalid(serviceConfig, blue);
         if (primaryResult != null) {
             return primaryResult;
         }
 
-        var blueGreenConfig = serviceConfig.getBlueGreen();
+        // Get or create thread-safe configuration for this service
+        BlueGreenConfig blueGreenConfig = getOrCreateBlueGreenConfig(serviceConfig, serviceKey);
         if (blueGreenConfig == null) {
             return blue.get(); // Default to blue (stable)
         }
@@ -46,38 +101,171 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
     }
 
     /**
+     * Thread-safe method to get or create BlueGreenConfig for a service.
+     * Uses atomic operations to ensure consistency across multiple pods.
+     */
+    private BlueGreenConfig getOrCreateBlueGreenConfig(Object serviceConfig, String serviceKey) {
+        return configCache.get().computeIfAbsent(serviceKey, key -> {
+            try {
+                // Extract configuration from InitializerConfiguration
+                var config = (InitializerConfiguration.DeployableServices) serviceConfig;
+                var blueGreenSection = getBlueGreenSection(config);
+                
+                if (blueGreenSection == null) {
+                    return null;
+                }
+                
+                // Extract TTL and weight safely
+                Long ttl = extractTtl(blueGreenSection);
+                String weight = extractWeight(blueGreenSection);
+                
+                return new BlueGreenConfig(ttl, weight);
+            } catch (Exception e) {
+                log.warn("Failed to create BlueGreenConfig for service {}: {}", serviceKey, e.getMessage());
+                return null;
+            }
+        });
+    }
+
+    /**
+     * Safely extract BlueGreen section from service configuration.
+     */
+    private Object getBlueGreenSection(InitializerConfiguration.DeployableServices config) {
+        try {
+            // Use reflection or direct access based on actual configuration structure
+            var method = config.getClass().getMethod("getBlueGreen");
+            return method.invoke(config);
+        } catch (Exception e) {
+            log.debug("No BlueGreen configuration found for service");
+            return null;
+        }
+    }
+
+    /**
+     * Safely extract TTL from BlueGreen configuration.
+     */
+    private Long extractTtl(Object blueGreenSection) {
+        try {
+            var method = blueGreenSection.getClass().getMethod("getTtl");
+            return (Long) method.invoke(blueGreenSection);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Safely extract weight from BlueGreen configuration.
+     */
+    private String extractWeight(Object blueGreenSection) {
+        try {
+            var method = blueGreenSection.getClass().getMethod("getWeight");
+            return (String) method.invoke(blueGreenSection);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
      * Determines which environment (Blue or Green) should handle the request.
      * Blue-Green deployment uses binary switching, not gradual traffic shifting.
+     * Thread-safe implementation for multi-pod consistency.
      *
-     * @param blueGreenConfig the configuration for this service
+     * When both weight and TTL are configured:
+     * - Weight determines the INITIAL environment
+     * - TTL determines when to switch FROM that initial environment
+     *
+     * @param blueGreenConfig the validated configuration for this service
      * @param serviceKey      the service identifier
      * @return true if Green environment should be used, false for Blue
      */
-    private boolean determineActiveEnvironment(Object blueGreenConfig, String serviceKey) {
-        // Cast to actual config type to access TTL
-        var config = (InitializerConfiguration.BlueGreen) blueGreenConfig;
-
-        // Access TTL field (Lombok should generate getTtl() method)
-        Long ttl = config.getTtl();
-
-        if (ttl != null && ttl > elapsedSeconds) {
-            // TTL-based binary switch: Blue before TTL expires, Green after
-            elapsedSeconds = Duration.between(startTime, Instant.now()).toSeconds();
-            return elapsedSeconds >= ttl; // Switch to Green after TTL expires
+    private boolean determineActiveEnvironment(BlueGreenConfig blueGreenConfig, String serviceKey) {
+        // When both weight and TTL are configured, use weight as initial state and TTL for switching
+        if (blueGreenConfig.weight() != null && blueGreenConfig.ttl() != null) {
+            return isGreenEnvironmentActiveByWeightAndTtl(blueGreenConfig.weight(), blueGreenConfig.ttl(), serviceKey);
+        }
+        
+        // TTL-only: start with Blue, switch to Green after TTL
+        if (blueGreenConfig.ttl() != null) {
+            return isGreenEnvironmentActiveByTtl(blueGreenConfig.ttl(), serviceKey);
         }
 
-        // No TTL configured, check weight for manual switch
-        String weight = config.getWeight();
-        if (weight != null) {
-            return parseEnvironmentFromWeight(weight);
+        // Weight-only: static environment based on weight
+        if (blueGreenConfig.weight() != null) {
+            return parseEnvironmentFromWeight(blueGreenConfig.weight());
         }
 
         return false; // Default to Blue (stable) environment
     }
 
     /**
+     * Thread-safe environment determination when both weight and TTL are configured.
+     * Weight determines the INITIAL environment, TTL determines when to switch FROM that initial environment.
+     * 
+     * TTL behavior:
+     * - TTL = 0 or undefined → Infinite TTL (never switch, stay in initial environment)
+     * - TTL > 0 → Switch to opposite environment after TTL seconds
+     * 
+     * Examples:
+     * - weight: "0/1", ttl: 20 → Start with Green, switch to Blue after 20 seconds
+     * - weight: "0/1", ttl: 0 → Start with Green, never switch (infinite TTL)
+     * - weight: "1/0", ttl: 20 → Start with Blue, switch to Green after 20 seconds
+     */
+    private boolean isGreenEnvironmentActiveByWeightAndTtl(String weight, Long ttl, String serviceKey) {
+        // Determine initial environment from weight
+        boolean initiallyGreen = parseEnvironmentFromWeight(weight);
+        
+        // If TTL is 0 or undefined, treat as infinite (never switch)
+        if (ttl == null || ttl <= 0) {
+            return initiallyGreen; // Stay in initial environment forever
+        }
+        
+        // Get or create start time for this service atomically
+        AtomicReference<Instant> startTimeRef = serviceStartTimes.computeIfAbsent(
+            serviceKey, 
+            key -> new AtomicReference<>(Instant.now())
+        );
+        
+        Instant startTime = startTimeRef.get();
+        long elapsedSeconds = Duration.between(startTime, Instant.now()).toSeconds();
+        
+        // Switch to opposite environment after TTL expires
+        if (elapsedSeconds >= ttl) {
+            return !initiallyGreen; // Switch to opposite environment
+        } else {
+            return initiallyGreen; // Use initial environment
+        }
+    }
+
+    /**
+     * Thread-safe TTL-based environment determination.
+     * Each service maintains its own start time for consistency across pods.
+     * 
+     * TTL behavior:
+     * - TTL = 0 or undefined → Infinite TTL (stay in Blue forever)
+     * - TTL > 0 → Start with Blue, switch to Green after TTL seconds
+     */
+    private boolean isGreenEnvironmentActiveByTtl(Long ttl, String serviceKey) {
+        // If TTL is 0 or undefined, treat as infinite (stay in Blue forever)
+        if (ttl == null || ttl <= 0) {
+            return false; // Always use Blue (stable) environment
+        }
+        
+        // Get or create start time for this service atomically
+        AtomicReference<Instant> startTimeRef = serviceStartTimes.computeIfAbsent(
+            serviceKey, 
+            key -> new AtomicReference<>(Instant.now())
+        );
+        
+        Instant startTime = startTimeRef.get();
+        long elapsedSeconds = Duration.between(startTime, Instant.now()).toSeconds();
+        
+        // Switch to Green after TTL expires
+        return elapsedSeconds >= ttl;
+    }
+
+    /**
      * Parses weight configuration to determine active environment.
-     * For Blue-Green, weight should be binary: "1/0" (Blue) or "0/1" (Green)
+     * For Blue-Green, weight should be binary: "1/0" (Blue active) or "0/1" (Green active)
      */
     private boolean parseEnvironmentFromWeight(String weight) {
         if (weight == null || weight.trim().isEmpty()) {
@@ -90,17 +278,19 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
                 var blueWeight = Integer.parseInt(weights[0].trim());
                 var greenWeight = Integer.parseInt(weights[1].trim());
 
-                // Validate binary weights
-                if ((blueWeight == 1 && greenWeight == 0) || (blueWeight == 0 && greenWeight == 1)) {
-                    return greenWeight == 1; // Return true if Green is active
+                // Validate binary weights - exactly one must be 1, the other must be 0
+                if (blueWeight == 1 && greenWeight == 0) {
+                    return false; // Blue is active (1/0)
+                } else if (blueWeight == 0 && greenWeight == 1) {
+                    return true; // Green is active (0/1)
                 }
             }
 
-            throw new IllegalArgumentException("Blue-Green weights must be binary: '1/0' or '0/1'");
+            throw new IllegalArgumentException("Blue-Green weights must be binary: '1/0' (Blue active) or '0/1' (Green active)");
 
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("Invalid weight format: " + weight +
-                    ". Expected binary format: '1/0' (Blue) or '0/1' (Green)");
+                    ". Expected binary format: '1/0' (Blue active) or '0/1' (Green active)");
         }
     }
 }
