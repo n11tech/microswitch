@@ -33,14 +33,14 @@
 <dependency>
     <groupId>com.n11.development</groupId>
     <artifactId>microswitch</artifactId>
-    <version>1.0</version>
+    <version>1.0.0</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```gradle
-implementation 'com.n11.development:microswitch:1.0'
+implementation 'com.n11.development:microswitch:1.0.0'
 ```
 
 ## 🚀 Hızlı Başlangıç
@@ -198,6 +198,19 @@ GET /actuator/microswitch
 ```
 
 ## 📚 API Referansı
+
+### Public API and Module Boundaries
+
+Bu kütüphanenin dışarıya açık tek API yüzeyi `com.microswitch.infrastructure.manager.DeploymentManager` sınıfıdır. JPMS (Java Platform Module System) ile yalnızca bu paket export edilmiştir. Diğer tüm paketler (ör. `domain`, `application`, `infrastructure` iç detayları) dış projeler tarafından kullanıma kapalıdır ve geriye dönük uyumluluk garantisi verilmez.
+
+- Export edilen paket: `com.microswitch.infrastructure.manager`
+- Açılan (reflective access için) paketler:
+  - `com.microswitch.application.config` — Spring Boot auto-configuration için
+  - `com.microswitch.infrastructure.external` — Actuator endpoint’leri için
+
+Notlar:
+- Bu sınırlar domain/application/infrastructure katmanlarını taşımadan korunur.
+- Tüketici projeler modül yolunu (module-path) kullanıyorsa, yalnızca `DeploymentManager` derleme zamanı erişimine izin verilir. Classpath modunda da bu sözleşmeye uymanız önerilir.
 
 ### DeploymentManager
 

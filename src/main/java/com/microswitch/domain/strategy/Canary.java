@@ -9,11 +9,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Canary extends DeployTemplate implements DeploymentStrategy {
     
-    private static final Logger logger = Logger.getLogger(Canary.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(Canary.class);
 
     // Thread-safe distributed state management
     private final ConcurrentHashMap<String, AtomicInteger> serviceCounters = new ConcurrentHashMap<>();
@@ -122,7 +123,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
             }
             return 100 / gcdValue;
         } catch (ArithmeticException e) {
-            logger.warning("GCD calculation failed, using default total calls of 100: " + e.getMessage());
+            logger.warn("GCD calculation failed, using default total calls of 100: " + e.getMessage());
             return 100;
         }
     }
@@ -212,7 +213,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
                     return type;
                 }
             }
-            logger.warning("Unknown algorithm type: " + algorithmString + ", defaulting to SEQUENCE");
+            logger.warn("Unknown algorithm type: " + algorithmString + ", defaulting to SEQUENCE");
             return AlgorithmType.SEQUENTIAL;
         }
     }
@@ -237,7 +238,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
             try {
                 return new UniqueRandomGenerator(config.totalCalls());
             } catch (Exception e) {
-                logger.warning("Failed to create UniqueRandomGenerator for service " + serviceKey + ", using fallback: " + e.getMessage());
+                logger.warn("Failed to create UniqueRandomGenerator for service " + serviceKey + ", using fallback: " + e.getMessage());
                 return new UniqueRandomGenerator(100); // Fallback
             }
         });
@@ -250,7 +251,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
                     generator = new UniqueRandomGenerator(config.totalCalls());
                     randomGenerators.put(serviceKey, generator);
                 } catch (Exception e) {
-                    logger.warning("Failed to reset UniqueRandomGenerator for service " + serviceKey + ": " + e.getMessage());
+                    logger.warn("Failed to reset UniqueRandomGenerator for service " + serviceKey + ": " + e.getMessage());
                     // Continue with existing generator
                 }
             }
