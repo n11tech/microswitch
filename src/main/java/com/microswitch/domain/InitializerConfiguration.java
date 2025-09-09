@@ -2,6 +2,7 @@ package com.microswitch.domain;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.microswitch.domain.value.AlgorithmType;
+import com.microswitch.domain.value.MethodType;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -31,8 +32,8 @@ public class InitializerConfiguration {
     @Setter
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class Canary {
-        private Integer primaryPercentage;
-        private String algorithm = AlgorithmType.SEQUENCE.getValue().toLowerCase();
+        private String percentage;
+        private String algorithm = AlgorithmType.SEQUENTIAL.getValue().toLowerCase();
     }
 
     @Getter
@@ -47,6 +48,8 @@ public class InitializerConfiguration {
     @Setter
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class Shadow {
-        private Short weight;
+        private MethodType stable;
+        private MethodType mirror;
+        private Short mirrorPercentage;
     }
 }

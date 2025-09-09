@@ -14,7 +14,7 @@ microswitch:
       canary:
         # Percentage of traffic going to the primary (stable) version in canary deployment.
         # Remaining percentage goes to the canary version.
-        primaryPercentage: 90
+        percentage: 10/90
         # Algorithm determining how canary routing is selected. Defaults to SEQUENCE.
         # Other supported values must match AlgorithmType enum values.
         algorithm: SEQUENCE
@@ -24,8 +24,9 @@ microswitch:
         # Time-to-live in milliseconds for session stickiness or route persistence (if applicable).
         ttl: 60000
       shadow:
-        # Weight for shadow traffic mirroring. Short (0-100 recommended range depending on implementation).
-        weight: 10
+        stable: primary
+        mirror: secondary
+        mirrorPercentage: 10
 
     payment-service:
       enabled: false
@@ -33,10 +34,12 @@ microswitch:
         primaryPercentage: 95
         algorithm: SEQUENCE
       blueGreen:
-        primaryPercentage: 100
+        weight: 0/1
         ttl: 120000
       shadow:
-        weight: 0
+        stable: primary
+        mirror: secondary
+        mirrorPercentage: 20
 
 # You can override any of these values per environment using Spring profiles,
 # e.g., create application-dev.yml and application-prod.yml and place overrides there.
