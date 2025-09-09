@@ -2,6 +2,7 @@ package com.microswitch.domain.strategy;
 
 import com.microswitch.application.executor.DeploymentStrategy;
 import com.microswitch.domain.InitializerConfiguration;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,9 +22,10 @@ import java.util.function.Supplier;
  * Traffic can be switched instantly between environments based on TTL or weight configuration.
  * This implementation ensures consistency across multiple pods in a Kubernetes cluster.
  */
+
+@Slf4j
 public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
-    private static final Logger log = LoggerFactory.getLogger(BlueGreen.class);
-    
+
     // Thread-safe per-service state management for multi-pod consistency
     private final ConcurrentHashMap<String, AtomicReference<Instant>> serviceStartTimes = new ConcurrentHashMap<>();
     private final AtomicReference<ConcurrentHashMap<String, BlueGreenConfig>> configCache = new AtomicReference<>(new ConcurrentHashMap<>());
@@ -38,23 +40,23 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
             if (ttl != null && ttl < 0) {
                 throw new IllegalArgumentException("TTL must be non-negative, got: " + ttl);
             }
-            
+
             // Validate weight format if provided
             if (weight != null && !weight.trim().isEmpty()) {
                 validateWeightFormat(weight);
             }
         }
-        
+
         private static void validateWeightFormat(String weight) {
             try {
                 var weights = weight.split("/");
                 if (weights.length != 2) {
                     throw new IllegalArgumentException("Weight must be in format 'blue/green', got: " + weight);
                 }
-                
+
                 var blueWeight = Integer.parseInt(weights[0].trim());
                 var greenWeight = Integer.parseInt(weights[1].trim());
-                
+
                 // Blue-Green must be binary: either 1/0 or 0/1
                 if (!((blueWeight == 1 && greenWeight == 0) || (blueWeight == 0 && greenWeight == 1))) {
                     throw new IllegalArgumentException("Blue-Green weights must be binary: '1/0' or '0/1', got: " + weight);
@@ -110,15 +112,15 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
                 // Extract configuration from InitializerConfiguration
                 var config = (InitializerConfiguration.DeployableServices) serviceConfig;
                 var blueGreenSection = getBlueGreenSection(config);
-                
+
                 if (blueGreenSection == null) {
                     return null;
                 }
-                
+
                 // Extract TTL and weight safely
                 Long ttl = extractTtl(blueGreenSection);
                 String weight = extractWeight(blueGreenSection);
-                
+
                 return new BlueGreenConfig(ttl, weight);
             } catch (Exception e) {
                 log.warn("Failed to create BlueGreenConfig for service {}: {}", serviceKey, e.getMessage());
@@ -169,7 +171,7 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
      * Determines which environment (Blue or Green) should handle the request.
      * Blue-Green deployment uses binary switching, not gradual traffic shifting.
      * Thread-safe implementation for multi-pod consistency.
-     *
+     * <p>
      * When both weight and TTL are configured:
      * - Weight determines the INITIAL environment
      * - TTL determines when to switch FROM that initial environment
@@ -183,7 +185,7 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
         if (blueGreenConfig.weight() != null && blueGreenConfig.ttl() != null) {
             return isGreenEnvironmentActiveByWeightAndTtl(blueGreenConfig.weight(), blueGreenConfig.ttl(), serviceKey);
         }
-        
+
         // TTL-only: start with Blue, switch to Green after TTL
         if (blueGreenConfig.ttl() != null) {
             return isGreenEnvironmentActiveByTtl(blueGreenConfig.ttl(), serviceKey);
@@ -200,11 +202,11 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
     /**
      * Thread-safe environment determination when both weight and TTL are configured.
      * Weight determines the INITIAL environment, TTL determines when to switch FROM that initial environment.
-     * 
+     * <p>
      * TTL behavior:
      * - TTL = 0 or undefined → Infinite TTL (never switch, stay in initial environment)
      * - TTL > 0 → Switch to opposite environment after TTL seconds
-     * 
+     * <p>
      * Examples:
      * - weight: "0/1", ttl: 20 → Start with Green, switch to Blue after 20 seconds
      * - weight: "0/1", ttl: 0 → Start with Green, never switch (infinite TTL)
@@ -213,21 +215,21 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
     private boolean isGreenEnvironmentActiveByWeightAndTtl(String weight, Long ttl, String serviceKey) {
         // Determine initial environment from weight
         boolean initiallyGreen = parseEnvironmentFromWeight(weight);
-        
+
         // If TTL is 0 or undefined, treat as infinite (never switch)
         if (ttl == null || ttl <= 0) {
             return initiallyGreen; // Stay in initial environment forever
         }
-        
+
         // Get or create start time for this service atomically
         AtomicReference<Instant> startTimeRef = serviceStartTimes.computeIfAbsent(
-            serviceKey, 
-            key -> new AtomicReference<>(Instant.now())
+                serviceKey,
+                key -> new AtomicReference<>(Instant.now())
         );
-        
+
         Instant startTime = startTimeRef.get();
         long elapsedSeconds = Duration.between(startTime, Instant.now()).toSeconds();
-        
+
         // Switch to opposite environment after TTL expires
         if (elapsedSeconds >= ttl) {
             return !initiallyGreen; // Switch to opposite environment
@@ -239,7 +241,7 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
     /**
      * Thread-safe TTL-based environment determination.
      * Each service maintains its own start time for consistency across pods.
-     * 
+     * <p>
      * TTL behavior:
      * - TTL = 0 or undefined → Infinite TTL (stay in Blue forever)
      * - TTL > 0 → Start with Blue, switch to Green after TTL seconds
@@ -249,16 +251,16 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
         if (ttl == null || ttl <= 0) {
             return false; // Always use Blue (stable) environment
         }
-        
+
         // Get or create start time for this service atomically
         AtomicReference<Instant> startTimeRef = serviceStartTimes.computeIfAbsent(
-            serviceKey, 
-            key -> new AtomicReference<>(Instant.now())
+                serviceKey,
+                key -> new AtomicReference<>(Instant.now())
         );
-        
+
         Instant startTime = startTimeRef.get();
         long elapsedSeconds = Duration.between(startTime, Instant.now()).toSeconds();
-        
+
         // Switch to Green after TTL expires
         return elapsedSeconds >= ttl;
     }

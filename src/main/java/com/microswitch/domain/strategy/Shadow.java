@@ -3,15 +3,15 @@ package com.microswitch.domain.strategy;
 import com.microswitch.application.executor.DeploymentStrategy;
 import com.microswitch.domain.InitializerConfiguration;
 import com.microswitch.domain.value.MethodType;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Objects;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
-import java.util.logging.Logger;
 
+@Slf4j
 public class Shadow extends DeployTemplate implements DeploymentStrategy {
-    private static final Logger logger = Logger.getLogger(Shadow.class.getName());
     private static final int DEFAULT_TIMEOUT_SECONDS = 30;
 
     private final AtomicInteger requestCounter = new AtomicInteger(0);
@@ -68,7 +68,7 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
 
     private <R> R executeAsyncSimultaneously(Supplier<R> primary, Supplier<R> secondary, InitializerConfiguration.Shadow shadowConfig, String serviceKey) {
         if (isShutdown) {
-            logger.warning("Shadow executor is shutdown, falling back to stable method");
+            log.warn("Shadow executor is shutdown, falling back to stable method");
             return executeStableMethod(primary, secondary, shadowConfig);
         }
 
@@ -89,7 +89,7 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
             // Handle mirror result with proper exception handling
             R mirrorResult = futureMirror.handle((result, throwable) -> {
                 if (throwable != null) {
-                    logger.warning("Mirror execution failed: " + throwable.getMessage());
+                    log.warn("Mirror execution failed: " + throwable.getMessage());
                     return null;
                 }
                 return result;
@@ -97,17 +97,17 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
 
             // Compare results and log differences
             if (Objects.isNull(mirrorResult)) {
-                logger.warning("Shadow result is null. The shadow function may have thrown an exception or returned null.");
+                log.warn("Shadow result is null. The shadow function may have thrown an exception or returned null.");
             } else if (!stableResult.equals(mirrorResult)) {
-                logger.warning("Shadow result does not match stable result for service: " + serviceKey);
+                log.warn("Shadow result does not match stable result for service: " + serviceKey);
             } else {
-                logger.info("Shadow execution successful - results match for service: " + serviceKey);
+                log.info("Shadow execution successful - results match for service: " + serviceKey);
             }
 
             return stableResult;
 
         } catch (CompletionException e) {
-            logger.severe("Shadow execution timeout or failure for service " + serviceKey + ": " + e.getMessage());
+            log.error("Shadow execution timeout or failure for service " + serviceKey + ": " + e.getMessage());
             // Fallback to stable method on timeout/failure
             return executeStableMethod(primary, secondary, shadowConfig);
         }
@@ -128,7 +128,7 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
                 shadowExecutor.shutdownNow();
                 Thread.currentThread().interrupt();
             }
-            logger.info("Shadow executor shutdown completed");
+            log.info("Shadow executor shutdown completed");
         }
     }
 }
