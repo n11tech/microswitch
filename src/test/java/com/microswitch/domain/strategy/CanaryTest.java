@@ -96,7 +96,7 @@ class CanaryTest {
         deployableServices.setEnabled(true);
         
         InitializerConfiguration.Canary canaryConfig = new InitializerConfiguration.Canary();
-        canaryConfig.setPrimaryPercentage(80);
+        canaryConfig.setPercentage("80/20");
         canaryConfig.setAlgorithm("sequence");
         deployableServices.setCanary(canaryConfig);
         
@@ -122,7 +122,7 @@ class CanaryTest {
         deployableServices.setEnabled(true);
         
         InitializerConfiguration.Canary canaryConfig = new InitializerConfiguration.Canary();
-        canaryConfig.setPrimaryPercentage(150); // Invalid percentage
+        canaryConfig.setPercentage("150/-50"); // Invalid: values out of 0-100 and not summing to 100
         deployableServices.setCanary(canaryConfig);
         
         properties.getServices().put(serviceKey, deployableServices);
@@ -143,7 +143,7 @@ class CanaryTest {
         deployableServices.setEnabled(true);
         
         InitializerConfiguration.Canary canaryConfig = new InitializerConfiguration.Canary();
-        canaryConfig.setPrimaryPercentage(100); // Always primary
+        canaryConfig.setPercentage("100/0"); // Always primary
         deployableServices.setCanary(canaryConfig);
         
         properties.getServices().put(serviceKey, deployableServices);

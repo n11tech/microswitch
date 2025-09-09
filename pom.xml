@@ -45,22 +45,10 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Spring Boot Actuator -->
+        <!-- Spring Boot Actuator for endpoints -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
-        </dependency>
-
-        <!-- Spring Boot Web Starter for testing -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>
-
-        <!-- Spring Boot AOP Starter -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
 
         <!-- Jackson for YAML processing -->
@@ -75,10 +63,6 @@
             <artifactId>micrometer-core</artifactId>
         </dependency>
 
-        <dependency>
-            <groupId>io.micrometer</groupId>
-            <artifactId>micrometer-registry-prometheus</artifactId>
-        </dependency>
 
         <!-- Test Dependencies -->
         <dependency>
@@ -87,21 +71,6 @@
             <scope>test</scope>
         </dependency>
         
-        <!-- Mockito Inline for Java 21+ compatibility -->
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-inline</artifactId>
-            <version>5.2.0</version>
-            <scope>test</scope>
-        </dependency>
-        
-        <!-- ByteBuddy for better Java 21+ support -->
-        <dependency>
-            <groupId>net.bytebuddy</groupId>
-            <artifactId>byte-buddy</artifactId>
-            <version>1.14.8</version>
-            <scope>test</scope>
-        </dependency>
 
         <dependency>
             <groupId>org.projectlombok</groupId>

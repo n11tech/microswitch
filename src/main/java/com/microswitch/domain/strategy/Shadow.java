@@ -2,19 +2,32 @@ package com.microswitch.domain.strategy;
 
 import com.microswitch.application.executor.DeploymentStrategy;
 import com.microswitch.domain.InitializerConfiguration;
-import lombok.extern.slf4j.Slf4j;
+import com.microswitch.domain.value.MethodType;
 
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
+import java.util.logging.Logger;
 
-@Slf4j
 public class Shadow extends DeployTemplate implements DeploymentStrategy {
-    private static final byte DEFAULT_SHADOW_WEIGH = 1;
-    private Short weightCounter = (short) DEFAULT_SHADOW_WEIGH;
+    private static final Logger logger = Logger.getLogger(Shadow.class.getName());
+    private static final int DEFAULT_TIMEOUT_SECONDS = 30;
+
+    private final AtomicInteger requestCounter = new AtomicInteger(0);
+    private final ExecutorService shadowExecutor;
+    private volatile boolean isShutdown = false;
 
     public Shadow(InitializerConfiguration properties) {
         super(properties);
+        // Use virtual threads for better scalability and resource efficiency
+        // Virtual threads are lightweight and can handle thousands of concurrent tasks
+        this.shadowExecutor = Executors.newThreadPerTaskExecutor(
+                Thread.ofVirtual().name("shadow-virtual-", 0).factory()
+        );
+
+        // Add shutdown hook for proper cleanup
+        Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
     }
 
     @Override
@@ -26,43 +39,96 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
         }
 
         var shadowConfig = serviceConfig.getShadow();
-        if (shadowConfig == null || shadowConfig.getWeight() == null || shadowConfig.getWeight() <= 0) {
+        if (shadowConfig == null || shadowConfig.getMirrorPercentage() == null || shadowConfig.getMirrorPercentage() <= 0) {
             return primary.get();
         }
 
-        var weight = shadowConfig.getWeight();
+        var mirrorPercentage = shadowConfig.getMirrorPercentage();
 
-        if (weight.equals(weightCounter)) {
-            weightCounter = (short) DEFAULT_SHADOW_WEIGH;
-            return executeAsyncSimultaneously(primary, secondary, serviceKey);
+        // Calculate if this request should trigger mirror execution
+        // For 20% mirroring: every 5th request (100/20 = 5) should trigger mirror
+        int currentRequest = requestCounter.incrementAndGet();
+        int interval = 100 / mirrorPercentage; // 20% -> interval of 5
+
+        if (currentRequest % interval == 0) {
+            return executeAsyncSimultaneously(primary, secondary, shadowConfig, serviceKey);
         } else {
-            weightCounter++;
-            return executeJustPrimary(primary);
+            return executeStableMethod(primary, secondary, shadowConfig);
         }
     }
 
-    private static <R> R executeJustPrimary(Supplier<R> primary) {
-        return primary.get();
+    private <R> R executeStableMethod(Supplier<R> primary, Supplier<R> secondary, InitializerConfiguration.Shadow shadowConfig) {
+        var stableMethod = shadowConfig.getStable();
+        if (stableMethod == MethodType.PRIMARY) {
+            return primary.get();
+        } else {
+            return secondary.get();
+        }
     }
 
-    private <R> R executeAsyncSimultaneously(Supplier<R> primary, Supplier<R> secondary, String serviceKey) {
-        var futurePrimary = CompletableFuture.supplyAsync(primary);
-        var futureSecondary = CompletableFuture.supplyAsync(secondary);
-        CompletableFuture.allOf(futurePrimary, futureSecondary).join();
+    private <R> R executeAsyncSimultaneously(Supplier<R> primary, Supplier<R> secondary, InitializerConfiguration.Shadow shadowConfig, String serviceKey) {
+        if (isShutdown) {
+            logger.warning("Shadow executor is shutdown, falling back to stable method");
+            return executeStableMethod(primary, secondary, shadowConfig);
+        }
 
-        R result1 = futurePrimary.join();
-        R result2 = null;
+        Supplier<R> stableSupplier = (shadowConfig.getStable() == MethodType.PRIMARY) ? primary : secondary;
+        Supplier<R> mirrorSupplier = (shadowConfig.getMirror() == MethodType.PRIMARY) ? primary : secondary;
+
+        CompletableFuture<R> futureStable = CompletableFuture.supplyAsync(stableSupplier, shadowExecutor);
+        CompletableFuture<R> futureMirror = CompletableFuture.supplyAsync(mirrorSupplier, shadowExecutor);
+
         try {
-            result2 = futureSecondary.join();
-        } catch (Exception e) {
-            log.error("Shadow execution failed with an exception", e);
+            // Wait for both futures with timeout
+            CompletableFuture.allOf(futureStable, futureMirror)
+                    .orTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .join();
+
+            R stableResult = futureStable.join();
+
+            // Handle mirror result with proper exception handling
+            R mirrorResult = futureMirror.handle((result, throwable) -> {
+                if (throwable != null) {
+                    logger.warning("Mirror execution failed: " + throwable.getMessage());
+                    return null;
+                }
+                return result;
+            }).join();
+
+            // Compare results and log differences
+            if (Objects.isNull(mirrorResult)) {
+                logger.warning("Shadow result is null. The shadow function may have thrown an exception or returned null.");
+            } else if (!stableResult.equals(mirrorResult)) {
+                logger.warning("Shadow result does not match stable result for service: " + serviceKey);
+            } else {
+                logger.info("Shadow execution successful - results match for service: " + serviceKey);
+            }
+
+            return stableResult;
+
+        } catch (CompletionException e) {
+            logger.severe("Shadow execution timeout or failure for service " + serviceKey + ": " + e.getMessage());
+            // Fallback to stable method on timeout/failure
+            return executeStableMethod(primary, secondary, shadowConfig);
         }
+    }
 
-        if (Objects.isNull(result2))
-            log.warn("Shadow result is null. The shadow function may have thrown an exception or returned null.");
-        else if (!result1.equals(result2))
-            log.warn("Shadow result does not match original result.");
-
-        return result1;
+    /**
+     * Gracefully shutdown the shadow executor
+     */
+    private void shutdown() {
+        if (!isShutdown) {
+            isShutdown = true;
+            shadowExecutor.shutdown();
+            try {
+                if (!shadowExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                    shadowExecutor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                shadowExecutor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+            logger.info("Shadow executor shutdown completed");
+        }
     }
 }
