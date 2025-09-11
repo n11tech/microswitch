@@ -207,7 +207,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
                     return type;
                 }
             }
-            logger.warn("Unknown algorithm type: " + algorithmString + ", defaulting to SEQUENCE");
+            logger.warn("Unknown algorithm type: " + algorithmString + ", defaulting to sequential");
             return AlgorithmType.SEQUENTIAL;
         }
     }
