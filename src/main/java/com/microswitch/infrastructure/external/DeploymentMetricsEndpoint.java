@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 @Component
-@Endpoint(id = "deployment-metrics")
+@Endpoint(id = "microswitch")
 public class DeploymentMetricsEndpoint {
     
     private final DeploymentMetricsService deploymentMetricsService;

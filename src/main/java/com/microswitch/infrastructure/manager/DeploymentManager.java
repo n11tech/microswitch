@@ -1,7 +1,5 @@
 package com.microswitch.infrastructure.manager;
 
-import com.microswitch.application.executor.DeploymentStrategyExecutor;
-
 import java.util.function.Supplier;
 
 /**
@@ -9,7 +7,7 @@ import java.util.function.Supplier;
  *
  * <p>This class provides a simplified interface for executing deployment strategies
  * such as Canary, Shadow, and Blue/Green deployments. It delegates the actual
- * strategy execution to the configured {@link DeploymentStrategyExecutor}.
+ * strategy execution to an internal executor without exposing implementation details.
  *
  * <p>All methods use lazy evaluation through {@link Supplier} parameters,
  * ensuring that only the selected deployment path is executed.
@@ -31,8 +29,40 @@ import java.util.function.Supplier;
  * @author N11 Development Team
  * @since 1.0
  */
-public record DeploymentManager(DeploymentStrategyExecutor strategyExecutor) {
+public final class DeploymentManager {
+    
+    // Private field to hide internal implementation details from external consumers
+    // Using Object type to completely hide the internal implementation type
+    private final Object strategyExecutor;
+    
+    /**
+     * Private constructor to prevent direct instantiation.
+     * Use the static factory method instead.
+     */
+    private DeploymentManager(Object strategyExecutor) {
+        if (strategyExecutor == null) {
+            throw new NullPointerException("Strategy executor must not be null");
+        }
+        // Validate that the object is of the correct internal type
+        if (!strategyExecutor.getClass().getName().contains("DeploymentStrategyExecutor")) {
+            throw new IllegalArgumentException("Invalid strategy executor type");
+        }
+        this.strategyExecutor = strategyExecutor;
+    }
+    
+    /**
+     * Factory method for internal use by Spring auto-configuration.
+     * This method is intentionally not public to prevent external usage.
+     * The parameter is typed as Object to hide internal implementation types.
+     * 
+     * @param strategyExecutor the internal strategy executor
+     * @return a new DeploymentManager instance
+     */
+    static DeploymentManager createWithExecutor(Object strategyExecutor) {
+        return new DeploymentManager(strategyExecutor);
+    }
 
+    
     /**
      * Executes a canary deployment strategy.
      *
@@ -47,9 +77,10 @@ public record DeploymentManager(DeploymentStrategyExecutor strategyExecutor) {
      * @throws IllegalArgumentException if serviceKey is null or empty
      */
     public <R> R canary(Supplier<R> stable, Supplier<R> experimental, String serviceKey) {
-        return strategyExecutor.executeCanary(stable, experimental, serviceKey);
+        return invokeStrategy("executeCanary", stable, experimental, serviceKey);
     }
 
+    
     /**
      * Executes a shadow deployment strategy.
      *
@@ -65,9 +96,10 @@ public record DeploymentManager(DeploymentStrategyExecutor strategyExecutor) {
      * @throws IllegalArgumentException if serviceKey is null or empty
      */
     public <R> R shadow(Supplier<R> stable, Supplier<R> experimental, String serviceKey) {
-        return strategyExecutor.executeShadow(stable, experimental, serviceKey);
+        return invokeStrategy("executeShadow", stable, experimental, serviceKey);
     }
 
+    
     /**
      * Executes a blue/green deployment strategy.
      *
@@ -82,7 +114,22 @@ public record DeploymentManager(DeploymentStrategyExecutor strategyExecutor) {
      * @throws IllegalArgumentException if serviceKey is null or empty
      */
     public <R> R blueGreen(Supplier<R> stable, Supplier<R> experimental, String serviceKey) {
-        return strategyExecutor.executeBlueGreen(stable, experimental, serviceKey);
+        return invokeStrategy("executeBlueGreen", stable, experimental, serviceKey);
+    }
+    
+    /**
+     * Internal helper method to invoke strategy methods via reflection.
+     * This allows us to work with the internal executor without exposing its type.
+     */
+    @SuppressWarnings("unchecked")
+    private <R> R invokeStrategy(String methodName, Supplier<R> stable, 
+                                  Supplier<R> experimental, String serviceKey) {
+        try {
+            var method = strategyExecutor.getClass().getMethod(methodName, 
+                Supplier.class, Supplier.class, String.class);
+            return (R) method.invoke(strategyExecutor, stable, experimental, serviceKey);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to invoke strategy method: " + methodName, e);
+        }
     }
 }
-
