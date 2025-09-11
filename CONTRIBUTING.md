@@ -1,142 +1,181 @@
 # Contributing to Microswitch
 
-Thank you for your interest in contributing to Microswitch! We welcome contributions from the community.
+Thank you for your interest in contributing to Microswitch! We welcome contributions from the community and strive to make it easy to get involved.
+
+Microswitch is a Java 21 library built on Spring Boot 3.5.x. It exposes a small public API and hides internals using the Java Platform Module System (JPMS). The build is Maven-based and enforces quality with Checkstyle, JaCoCo, and Javadoc.
 
 ## Code of Conduct
 
-This project and everyone participating in it is governed by our [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
+Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you agree to uphold these standards.
 
-## How to Contribute
+## Table of Contents
 
-### Reporting Bugs
+- Getting Started
+- Development Workflow
+- Coding Standards
+- Testing Standards
+- Documentation Standards
+- Architecture Overview
+- Adding New Deployment Strategies
+- Commit, PR, and Release Guidelines
+- Security and Responsible Disclosure
+- Getting Help
 
-Before creating bug reports, please check the issue list as you might find out that you don't need to create one. When you are creating a bug report, please include as many details as possible:
+## Getting Started
 
-* **Use a clear and descriptive title**
-* **Describe the exact steps to reproduce the problem**
-* **Provide specific examples to demonstrate the steps**
-* **Describe the behavior you observed and what behavior you expected**
-* **Include details about your configuration and environment**
+1. Prerequisites
+   - Java 21 (or higher)
+   - Maven 3.8+ (3.9.x recommended)
 
-### Suggesting Enhancements
-
-Enhancement suggestions are tracked as GitHub issues. When creating an enhancement suggestion, please include:
-
-* **Use a clear and descriptive title**
-* **Provide a step-by-step description of the suggested enhancement**
-* **Provide specific examples to demonstrate the steps**
-* **Describe the current behavior and explain the behavior you expected**
-* **Explain why this enhancement would be useful**
-
-### Pull Requests
-
-1. Fork the repository
-2. Create a feature branch from `main`: `git checkout -b feature/amazing-feature`
-3. Make your changes
-4. Add tests for your changes
-5. Ensure all tests pass: `mvn clean test`
-6. Ensure code quality checks pass: `mvn clean verify`
-7. Commit your changes: `git commit -m 'Add amazing feature'`
-8. Push to the branch: `git push origin feature/amazing-feature`
-9. Open a Pull Request
-
-### Development Setup
-
-1. **Prerequisites**
-   - Java 21 or higher
-   - Maven 3.8 or higher
-
-2. **Clone the repository**
+2. Clone
    ```bash
    git clone https://github.com/n11-development/microswitch.git
    cd microswitch
    ```
 
-3. **Build the project**
+3. Build
    ```bash
-   mvn clean compile
+   mvn -q clean compile
    ```
 
-4. **Run tests**
+4. Run Tests and Quality Gates
    ```bash
-   mvn clean test
+   mvn -q clean verify
    ```
+   This runs unit tests (Surefire), coverage (JaCoCo), Checkstyle, sources, and Javadoc.
 
-5. **Run all quality checks**
+## Development Workflow
+
+1. Create a branch from `main`:
+   ```bash
+   git checkout -b feat/short-title
+   ```
+2. Make small, incremental commits (see Commit Guidelines below).
+3. Keep `pom.xml` aligned with the Spring Boot parent; avoid manually pinning Spring artifacts unless necessary.
+4. Ensure the module system stays consistent:
+   - Only export intended public APIs in `src/main/java/module-info.java`.
+   - Do not introduce `java.util.logging`; use SLF4J (`org.slf4j`) instead.
+5. Run the full quality pipeline before pushing:
    ```bash
    mvn clean verify
    ```
 
-### Code Style
+## Coding Standards
 
-We use Google Java Style Guide. The build includes Checkstyle validation that will enforce these standards.
+- Style: Google Java Style; enforced via Checkstyle (`maven-checkstyle-plugin`).
+- Java: Target release 21 (`maven.compiler.release`).
+- Logging: SLF4J API. Do not use `java.util.logging` (JPMS concerns and project convention).
+- Nullability: Prefer fail-fast validation with clear exceptions and messages.
+- Methods: Keep small and focused; refactor complex methods into helpers.
+- Public API: Provide Javadoc for all exported public types and methods.
 
-* Use meaningful variable and method names
-* Write comprehensive Javadoc for public APIs
-* Keep methods small and focused
-* Write tests for new functionality
-* Follow existing patterns in the codebase
+## Testing Standards
 
-### Testing
+- Framework: JUnit Jupiter (JUnit 5) via `spring-boot-starter-test` (test scope).
+- Naming: Tests must match Surefire includes: `**/*Test.java`, `**/*Tests.java`.
+- Coverage: Aim for ≥80% line coverage overall; cover edge cases and error paths.
+- Determinism: Avoid time- and randomness-based flakiness. If randomness is needed, inject deterministic seeds.
+- Example: See `src/test/java/com/microswitch/domain/strategy/ShadowTest.java` for strategy behavior coverage.
 
-* Write unit tests for all new functionality
-* Ensure integration tests pass
-* Aim for high test coverage (minimum 80%)
-* Test edge cases and error conditions
+Common commands:
+```bash
+mvn test          # run unit tests
+mvn verify        # tests + coverage + style + docs
+```
 
-### Documentation
+## Documentation Standards
 
-* Update README.md if needed
-* Add Javadoc for public APIs
-* Update DEPLOYMENT_USAGE.md for new features
-* Include examples in documentation
+- Update `README.md` for user-facing changes.
+- Update `EXAMPLES.md` and `DEPLOYMENT_USAGE.md` when adding features or usage patterns.
+- Keep `SECURITY.md` aligned with reporting channels in the Code of Conduct.
+- Maintain accurate Javadoc for exported APIs.
 
-## Development Guidelines
+## Architecture Overview
 
-### Architecture
+Microswitch follows a layered design and uses Spring Boot auto-configuration:
 
-Microswitch follows Clean Architecture principles:
+- Domain: strategies, value objects, and core rules.
+- Application: configuration and wiring (e.g., `MicroswitchAutoConfiguration`).
+- Infrastructure: integrations (Actuator, Micrometer) and external concerns.
 
-* **Domain Layer**: Core business logic and interfaces
-* **Application Layer**: Use cases and application services
-* **Infrastructure Layer**: External concerns (metrics, configuration)
+Patterns in use:
 
-### Design Patterns Used
+- Strategy (deployment strategies such as Canary, Shadow, Blue/Green)
+- Template Method (`DeployTemplate` consolidates shared validation/flow)
+- Factory/Facade (centralized access via a minimal public API)
 
-* **Strategy Pattern**: For deployment strategies
-* **Factory Pattern**: For strategy creation
-* **Facade Pattern**: For simplified API
-* **Template Method**: For common deployment logic
+JPMS note: The project explicitly exports only the public API package from `module-info.java`. Keep internal packages unexported.
 
-### Adding New Deployment Strategies
+Spring Boot auto-config notes:
 
-1. Create a new class implementing `DeploymentStrategy`
-2. Extend `DeployTemplate` for common functionality
-3. Add strategy to `StrategyType` enum
-4. Register in `DefaultDeploymentStrategyFactory`
-5. Add configuration properties
-6. Write comprehensive tests
-7. Update documentation
+- Prefer `@ConditionalOnBean` for optional beans (e.g., Micrometer `MeterRegistry`) instead of `@ConditionalOnClass`.
+- Keep autoconfiguration safe when optional dependencies are absent.
 
-## Release Process
+## Adding New Deployment Strategies
 
-1. Update version in `pom.xml`
-2. Update CHANGELOG.md
-3. Create release PR
-4. Tag release after merge
-5. GitHub Actions will handle deployment
+1. Create a concrete strategy implementing the strategy abstraction.
+2. Extend `DeployTemplate` to reuse validation and shared flow.
+3. Register the strategy with the executor/factory so it becomes discoverable.
+4. Add configuration properties and document them.
+5. Write comprehensive tests (positive/negative paths, edge cases).
+6. Update `README.md`, `EXAMPLES.md`, and `DEPLOYMENT_USAGE.md`.
+
+## Commit, PR, and Release Guidelines
+
+### Conventional Commits
+
+Use Conventional Commits to enable automated changelogs and semantic versioning:
+
+- `feat: …` new feature
+- `fix: …` bug fix
+- `docs: …` documentation only
+- `refactor: …` code change that neither fixes a bug nor adds a feature
+- `test: …` tests only
+- `build/chore/ci: …` tooling and process
+
+Examples:
+```text
+feat(strategy): add weighted shadow mirroring
+fix(canary): handle invalid percentage strings gracefully
+```
+
+### Pull Requests
+
+Before opening a PR:
+
+- Ensure `mvn clean verify` passes locally.
+- Add or update tests for your change.
+- Update docs as needed.
+- Fill the PR description with context, motivation, and screenshots/logs if relevant.
+
+PR Checklist:
+
+- [ ] Code compiles and builds with Java 21
+- [ ] Unit tests added/updated and passing
+- [ ] Checkstyle passes (no new warnings/errors)
+- [ ] Public APIs documented (if changed)
+- [ ] Docs updated (`README.md` / `EXAMPLES.md` / `DEPLOYMENT_USAGE.md`)
+- [ ] No forbidden dependencies introduced (e.g., `java.util.logging`)
+
+### Semantic Versioning & Releases
+
+We follow [Semantic Versioning](SEMANTIC_VERSIONING.md).
+
+Release steps (summary):
+
+1. Update version in `pom.xml` as appropriate (patch/minor/major).
+2. Update `CHANGELOG.md` based on Conventional Commits.
+3. Create a release PR and get approvals.
+4. Tag after merge (CI/CD takes over per repository configuration).
+
+## Security and Responsible Disclosure
+
+Please review our [Security Policy](SECURITY.md). Do not open public issues for potential vulnerabilities. Follow the guidelines there and the reporting channel referenced in the Code of Conduct.
 
 ## Getting Help
 
-* Check existing [Issues](https://github.com/n11-development/microswitch/issues)
-* Create a new issue for questions
-* Join discussions in GitHub Discussions
-
-## Recognition
-
-Contributors will be recognized in:
-* README.md contributors section
-* Release notes
-* GitHub contributors page
+- Check existing [Issues](https://github.com/n11-development/microswitch/issues)
+- Open a new issue with full context and reproduction steps
+- Use GitHub Discussions if enabled
 
 Thank you for contributing to Microswitch! 🚀

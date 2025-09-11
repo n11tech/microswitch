@@ -20,7 +20,7 @@ public class DeploymentMetrics {
     public void recordSuccess(String serviceKey, String version, String strategy) {
         String key = createMetricKey(serviceKey, version, strategy);
         Counter counter = successCounters.computeIfAbsent(key, k -> 
-            Counter.builder("deployment.success")
+            Counter.builder("microswitch.success")
                 .tag("service", serviceKey)
                 .tag("version", version)
                 .tag("strategy", strategy)
@@ -33,7 +33,7 @@ public class DeploymentMetrics {
     public void recordError(String serviceKey, String version, String strategy) {
         String key = createMetricKey(serviceKey, version, strategy);
         Counter counter = errorCounters.computeIfAbsent(key, k -> 
-            Counter.builder("deployment.error")
+            Counter.builder("microswitch.error")
                 .tag("service", serviceKey)
                 .tag("version", version)
                 .tag("strategy", strategy)

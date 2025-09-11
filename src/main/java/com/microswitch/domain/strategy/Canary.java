@@ -16,12 +16,10 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
     
     private static final Logger logger = LoggerFactory.getLogger(Canary.class);
 
-    // Thread-safe distributed state management
     private final ConcurrentHashMap<String, AtomicInteger> serviceCounters = new ConcurrentHashMap<>();
     private final AtomicReference<ConcurrentHashMap<String, CanaryConfig>> serviceConfigs = new AtomicReference<>(new ConcurrentHashMap<>());
     private final ConcurrentHashMap<String, UniqueRandomGenerator> randomGenerators = new ConcurrentHashMap<>();
 
-    // Immutable configuration record
     private record CanaryConfig(int primaryPercentage, int secondaryPercentage, int totalCalls, AlgorithmType algorithm) {
         public CanaryConfig {
             validatePercentages(primaryPercentage, secondaryPercentage);
@@ -59,7 +57,6 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
 
     @Override
     public <R> R execute(Supplier<R> primary, Supplier<R> secondary, String serviceKey) {
-        // Input validation
         validateInputs(primary, secondary, serviceKey);
         
         var serviceConfig = validateServiceAndGetConfig(serviceKey, primary);
@@ -73,10 +70,8 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
             return primary.get();
         }
 
-        // Create immutable configuration
         CanaryConfig config = createCanaryConfig(canaryConfigData, serviceKey);
         
-        // Thread-safe execution based on algorithm
         if (config.algorithm() == AlgorithmType.RANDOM) {
             return executeRandom(primary, secondary, config, serviceKey).result;
         } else {
@@ -109,7 +104,6 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
         
         CanaryConfig config = new CanaryConfig(primaryPercentage, secondaryPercentage, totalCalls, algorithm);
         
-        // Cache configuration for this service
         serviceConfigs.get().put(serviceKey, config);
         
         return config;
@@ -130,7 +124,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
     
     private int[] parsePercentageString(String percentageString) {
         if (percentageString == null || percentageString.trim().isEmpty()) {
-            return new int[]{100, 0}; // Default: 100% primary, 0% secondary
+            return new int[]{100, 0};
         }
         
         String trimmed = percentageString.trim();
@@ -219,7 +213,6 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
     }
 
     private <R> ExecutionResult<R> executeSequence(Supplier<R> primary, Supplier<R> secondary, CanaryConfig config, String serviceKey) {
-        // Thread-safe counter per service
         AtomicInteger counter = serviceCounters.computeIfAbsent(serviceKey, k -> new AtomicInteger(0));
         
         int callsForPrimaryMethod = (config.totalCalls() * config.primaryPercentage()) / 100;
@@ -233,26 +226,23 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
     }
 
     private <R> ExecutionResult<R> executeRandom(Supplier<R> primary, Supplier<R> secondary, CanaryConfig config, String serviceKey) {
-        // Thread-safe random generator per service
         UniqueRandomGenerator generator = randomGenerators.computeIfAbsent(serviceKey, k -> {
             try {
                 return new UniqueRandomGenerator(config.totalCalls());
             } catch (Exception e) {
-                logger.warn("Failed to create UniqueRandomGenerator for service " + serviceKey + ", using fallback: " + e.getMessage());
-                return new UniqueRandomGenerator(100); // Fallback
+                logger.warn("Failed to create UniqueRandomGenerator for service " + serviceKey + ": " + e.getMessage());
+                return new UniqueRandomGenerator(100);
             }
         });
         
         int randomValue;
         synchronized (generator) {
-            // Reset generator if total calls changed
             if (generator.getUniqueValues().size() >= config.totalCalls()) {
                 try {
                     generator = new UniqueRandomGenerator(config.totalCalls());
                     randomGenerators.put(serviceKey, generator);
                 } catch (Exception e) {
                     logger.warn("Failed to reset UniqueRandomGenerator for service " + serviceKey + ": " + e.getMessage());
-                    // Continue with existing generator
                 }
             }
             randomValue = generator.getNextUniqueRandomValue();
@@ -268,7 +258,6 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
     }
 
     private int gcd(int a, int b) {
-        // Iterative implementation to prevent stack overflow
         a = Math.abs(a);
         b = Math.abs(b);
         
@@ -278,6 +267,6 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
             a = temp;
         }
         
-        return a == 0 ? 1 : a; // Prevent division by zero
+        return a == 0 ? 1 : a;
     }
 }

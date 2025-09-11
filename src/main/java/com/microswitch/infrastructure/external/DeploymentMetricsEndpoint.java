@@ -3,12 +3,11 @@ package com.microswitch.infrastructure.external;
 import com.microswitch.application.metric.DeploymentMetricsService;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
-import org.springframework.stereotype.Component;
 
 import java.util.Map;
+import java.util.HashMap;
 
-@Component
-@Endpoint(id = "microswitch")
+@Endpoint(id = "microswitch-metrics")
 public class DeploymentMetricsEndpoint {
     
     private final DeploymentMetricsService deploymentMetricsService;
@@ -19,6 +18,12 @@ public class DeploymentMetricsEndpoint {
     
     @ReadOperation
     public Map<String, Object> getMetrics() {
+        if (deploymentMetricsService == null) {
+            Map<String, Object> info = new HashMap<>();
+            info.put("status", "disabled");
+            info.put("reason", "Micrometer MeterRegistry not found. Add micrometer-registry-prometheus in the consuming app to enable metrics.");
+            return info;
+        }
         return deploymentMetricsService.getAllDeploymentMetrics();
     }
 }

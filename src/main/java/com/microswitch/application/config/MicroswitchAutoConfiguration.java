@@ -5,6 +5,8 @@ import com.microswitch.infrastructure.manager.DeploymentManager;
 import com.microswitch.domain.InitializerConfiguration;
 import com.microswitch.application.executor.DeploymentStrategyExecutor;
 import com.microswitch.application.executor.MicroswitchDeploymentStrategyExecutor;
+import com.microswitch.application.metric.DeploymentMetricsService;
+import com.microswitch.infrastructure.external.DeploymentMetricsEndpoint;
 import com.microswitch.infrastructure.external.Endpoint;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -36,7 +38,6 @@ import org.springframework.context.annotation.Configuration;
 @ConditionalOnClass({DeploymentManager.class})
 @EnableConfigurationProperties(InitializerConfiguration.class)
 @ComponentScan(basePackages = {
-        "com.microswitch.infrastructure.external",
         "com.microswitch.application.metric"
 })
 public class MicroswitchAutoConfiguration {
@@ -45,7 +46,7 @@ public class MicroswitchAutoConfiguration {
      * Creates the DeploymentStrategyExecutor bean if none exists.
      *
      * @param properties the microswitch configuration properties
-     * @param deploymentMetrics the deployment metrics service (optional)
+     * @param deploymentMetrics the deployment metrics (optional)
      * @return configured deployment strategy executor
      */
     @Bean
@@ -58,7 +59,7 @@ public class MicroswitchAutoConfiguration {
     /**
      * Creates the DeploymentManager bean if none exists.
      *
-     * @param strategyFactory the deployment strategy factory
+     * @param strategyFactory the deployment strategy executor
      * @return configured deployment manager
      */
     @Bean
@@ -79,7 +80,7 @@ public class MicroswitchAutoConfiguration {
      * Creates the DeploymentMetrics bean if none exists.
      *
      * @param meterRegistry the micrometer meter registry
-     * @return configured deployment metrics service
+     * @return configured deployment metrics
      */
     @Bean
     @ConditionalOnMissingBean(DeploymentMetrics.class)
@@ -108,6 +109,15 @@ public class MicroswitchAutoConfiguration {
         @ConditionalOnMissingBean(Endpoint.class)
         public Endpoint microswitchEndpoint(InitializerConfiguration properties) {
             return new Endpoint(properties);
+        }
+        
+        /**
+         * Creates the deployment metrics endpoint bean.
+         * The endpoint will gracefully handle absence of metrics service and report 'disabled'.
+         */
+        @Bean
+        public DeploymentMetricsEndpoint deploymentMetricsEndpoint(org.springframework.beans.factory.ObjectProvider<DeploymentMetricsService> deploymentMetricsServiceProvider) {
+            return new DeploymentMetricsEndpoint(deploymentMetricsServiceProvider.getIfAvailable());
         }
     }
 }

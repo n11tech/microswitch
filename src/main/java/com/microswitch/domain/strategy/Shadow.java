@@ -20,13 +20,9 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
 
     public Shadow(InitializerConfiguration properties) {
         super(properties);
-        // Use virtual threads for better scalability and resource efficiency
-        // Virtual threads are lightweight and can handle thousands of concurrent tasks
         this.shadowExecutor = Executors.newThreadPerTaskExecutor(
                 Thread.ofVirtual().name("shadow-virtual-", 0).factory()
         );
-
-        // Add shutdown hook for proper cleanup
         Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
     }
 
@@ -45,10 +41,8 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
 
         var mirrorPercentage = shadowConfig.getMirrorPercentage();
 
-        // Calculate if this request should trigger mirror execution
-        // For 20% mirroring: every 5th request (100/20 = 5) should trigger mirror
         int currentRequest = requestCounter.incrementAndGet();
-        int interval = 100 / mirrorPercentage; // 20% -> interval of 5
+        int interval = 100 / mirrorPercentage;
 
         if (currentRequest % interval == 0) {
             return executeAsyncSimultaneously(primary, secondary, shadowConfig, serviceKey);
@@ -79,36 +73,32 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
         CompletableFuture<R> futureMirror = CompletableFuture.supplyAsync(mirrorSupplier, shadowExecutor);
 
         try {
-            // Wait for both futures with timeout
             CompletableFuture.allOf(futureStable, futureMirror)
                     .orTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                     .join();
 
             R stableResult = futureStable.join();
 
-            // Handle mirror result with proper exception handling
             R mirrorResult = futureMirror.handle((result, throwable) -> {
                 if (throwable != null) {
-                    log.warn("Mirror execution failed: " + throwable.getMessage());
+                    log.warn("Mirror execution failed: {}", throwable.getMessage());
                     return null;
                 }
                 return result;
             }).join();
 
-            // Compare results and log differences
             if (Objects.isNull(mirrorResult)) {
                 log.warn("Shadow result is null. The shadow function may have thrown an exception or returned null.");
             } else if (!stableResult.equals(mirrorResult)) {
-                log.warn("Shadow result does not match stable result for service: " + serviceKey);
+                log.warn("Shadow result does not match stable result for service: {}", serviceKey);
             } else {
-                log.info("Shadow execution successful - results match for service: " + serviceKey);
+                log.info("Shadow execution successful - results match for service: {}", serviceKey);
             }
 
             return stableResult;
 
         } catch (CompletionException e) {
-            log.error("Shadow execution timeout or failure for service " + serviceKey + ": " + e.getMessage());
-            // Fallback to stable method on timeout/failure
+            log.error("Shadow execution timeout or failure for service {}: {}", serviceKey, e.getMessage());
             return executeStableMethod(primary, secondary, shadowConfig);
         }
     }
