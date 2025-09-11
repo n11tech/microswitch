@@ -19,10 +19,15 @@ class DeploymentManagerTest {
     private DeploymentManager deploymentManager;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         // Create simple test factory with test strategies
         TestDeploymentStrategyExecutor factory = new TestDeploymentStrategyExecutor();
-        deploymentManager = new DeploymentManager(factory);
+        
+        // Use reflection to access the package-private factory method
+        var factoryMethod = DeploymentManager.class.getDeclaredMethod(
+            "createWithExecutor", Object.class);
+        factoryMethod.setAccessible(true);
+        deploymentManager = (DeploymentManager) factoryMethod.invoke(null, factory);
     }
 
     @Test
