@@ -13,7 +13,7 @@
 
     <groupId>com.n11.development</groupId>
     <artifactId>microswitch</artifactId>
-    <version>1.1</version>
+    <version>1.0.0</version>
     <packaging>jar</packaging>
 
     <name>microswitch</name>
@@ -158,53 +158,6 @@
                     </execution>
                 </executions>
             </plugin>
-
-            <!-- Source Plugin -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-source-plugin</artifactId>
-                <version>${maven-source-plugin.version}</version>
-                <executions>
-                    <execution>
-                        <id>attach-sources</id>
-                        <goals>
-                            <goal>jar</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <!-- Javadoc Plugin -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <version>${maven-javadoc-plugin.version}</version>
-                <executions>
-                    <execution>
-                        <id>attach-javadocs</id>
-                        <goals>
-                            <goal>jar</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <source>21</source>
-                    <doclint>none</doclint>
-                </configuration>
-            </plugin>
         </plugins>
     </build>
-
-    <distributionManagement>
-        <snapshotRepository>
-            <id>snapshots</id>
-            <name>Snapshots Repo</name>
-            <url>http://nexus.n11.com/repository/snapshots</url>
-        </snapshotRepository>
-        <repository>
-            <id>releases</id>
-            <name>Releases Repo</name>
-            <url>http://nexus.n11.com/repository/releases</url>
-        </repository>
-    </distributionManagement>
 </project>
