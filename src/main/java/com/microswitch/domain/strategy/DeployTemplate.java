@@ -27,7 +27,7 @@ public abstract class DeployTemplate {
 
         var deployableService = configuration.getServices().get(serviceKey);
         if (deployableService == null || !deployableService.isEnabled()) {
-            return null; // Indicates primary should be executed
+            return null;
         }
 
         return deployableService;
@@ -46,6 +46,6 @@ public abstract class DeployTemplate {
         if (deployableServices == null) {
             return primary.get();
         }
-        return null; // Indicates service is valid, continue with strategy logic
+        return null;
     }
 }

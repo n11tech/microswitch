@@ -2,7 +2,7 @@ module com.n11.development.microswitch {
     // Export ONLY the public API - DeploymentManager
     // This is the ONLY class that consuming applications can access
     exports com.microswitch.infrastructure.manager;
-    
+
     // ALL OTHER PACKAGES ARE HIDDEN:
     // - com.microswitch.application.* (internal application logic)
     // - com.microswitch.domain.* (internal domain models and strategies)
@@ -11,7 +11,8 @@ module com.n11.development.microswitch {
     // Open minimal internal packages for Spring/Actuator reflective access ONLY
     // These packages remain inaccessible to consuming applications
     opens com.microswitch.application.config to spring.beans, spring.context, spring.boot.autoconfigure;
-    opens com.microswitch.infrastructure.external to spring.boot.actuator;
+    opens com.microswitch.application.metric to spring.beans, spring.context;
+    opens com.microswitch.infrastructure.external to spring.beans, spring.context, spring.boot.actuator;
     opens com.microswitch.domain to spring.boot.autoconfigure;
 
     // Spring Boot and Spring Framework dependencies

@@ -2,12 +2,14 @@ package com.microswitch.application.metric;
 
 import com.microswitch.domain.InitializerConfiguration;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
 import java.util.Map;
 
 @Service
+@ConditionalOnBean(DeploymentMetrics.class)
 @Slf4j
 public class DeploymentMetricsServiceImpl implements DeploymentMetricsService {
     
@@ -45,7 +47,7 @@ public class DeploymentMetricsServiceImpl implements DeploymentMetricsService {
 
                     if (serviceConfig.getBlueGreen() != null) {
                         String status = getBlueGreenStatus(serviceKey);
-                        metrics.put(serviceKey + "_bluegreen_status", status);
+                        metrics.put(serviceKey + "_blueGreen_status", status);
                         log.debug("Blue/Green status for {}: {}", serviceKey, status);
                     }
                 }

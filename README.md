@@ -1,100 +1,109 @@
-# 🚀 Microswitch - Deployment Strategy Library
+# 🚀 Microswitch — Deployment Strategy Library
 
-**Microswitch**, Java Spring Boot uygulamalarında **Canary**, **Shadow** ve **Blue/Green** deployment stratejilerini programmatik olarak yönetmenizi sağlayan güçlü bir kütüphanedir.
+Microswitch is a lightweight library for Java/Spring Boot that lets you apply deployment strategies programmatically: Canary, Shadow, and Blue/Green. It provides a single, minimal public API and hides all internals via JPMS.
 
-## 📋 İçindekiler
+This README explains how to add Microswitch to your project, configure it, and use it safely in production.
 
-- [Özellikler](#-özellikler)
-- [Kurulum](#-kurulum)
-- [Hızlı Başlangıç](#-hızlı-başlangıç)
-- [Deployment Stratejileri](#-deployment-stratejileri)
-- [Konfigürasyon](#-konfigürasyon)
-- [Metrics ve Monitoring](#-metrics-ve-monitoring)
-- [API Referansı](#-api-referansı)
-- [Örnekler](#-örnekler)
-- [Best Practices](#-best-practices)
-- [Troubleshooting](#-troubleshooting)
+## Table of Contents
 
-## ✨ Özellikler
+ - [Features](#features)
+ - [Requirements](#requirements)
+ - [Installation](#installation)
+ - [Quick Start](#quick-start)
+ - [Configuration](#configuration)
+ - [Public API & Module Boundaries](#public-api--module-boundaries)
+ - [JPMS Module-Info Usage](#jpms-module-info-usage)
+ - [Metrics & Actuator](#metrics--actuator)
+ - [Examples](#examples)
+ - [Troubleshooting](#troubleshooting)
+ - [Contributing & Governance](#contributing--governance)
+ - [Security](#security)
+ - [License (Apache-2.0)](#license-apache-2-0)
 
-- 🎯 **3 Deployment Stratejisi**: Canary, Shadow, Blue/Green
-- ⚡ **Lazy Evaluation**: Sadece seçilen method çalıştırılır
-- 📊 **Prometheus Metrics**: Otomatik performans izleme
-- 🔧 **Esnek Konfigürasyon**: YAML tabanlı ayarlar
-- 🏗️ **Spring Boot Auto-Configuration**: Otomatik bean yapılandırması
-- 🎛️ **Actuator Endpoints**: Runtime konfigürasyon görüntüleme
-- 🧪 **Production-Ready**: Test edilmiş ve optimize edilmiş
+## Features
 
-## 📦 Kurulum
+- Canary, Shadow, and Blue/Green strategies
+- Lazy evaluation (only the selected Supplier executes)
+- Optional Prometheus/Micrometer metrics
+- YAML-based configuration
+- Spring Boot auto-configuration
+- Actuator endpoint for runtime visibility
 
-### Maven
+## Requirements
+
+- Java 21+
+- Spring Boot 3.5.x
+
+## Installation
+
+Maven
 
 ```xml
 <dependency>
-    <groupId>com.n11.development</groupId>
-    <artifactId>microswitch</artifactId>
-    <version>1.0.0</version>
+  <groupId>com.n11.development</groupId>
+  <artifactId>microswitch</artifactId>
+  <version>1.0.0</version>
+  <scope>compile</scope>
 </dependency>
 ```
 
-### Gradle
+Gradle
 
 ```gradle
 implementation 'com.n11.development:microswitch:1.0.0'
 ```
 
-## 🚀 Hızlı Başlangıç
+## Quick Start
 
-### 1. Application Properties
+1) Configure application properties (application.yml)
 
 ```yaml
 microswitch:
+  enabled: true                       # master switch
   services:
     user-service:
       enabled: true
       canary:
-        primaryPercentage: 80
-        algorithm: "random"
-      shadow:
-        weight: 5
+        percentage: 80/20             # stable/experimental split
+        algorithm: SEQUENCE           # AlgorithmType enum (e.g., SEQUENCE, RANDOM)
       blueGreen:
-        primaryPercentage: 70
-        ttl: 3600
+        weight: 1/0                   # 1/0 → primary, 0/1 → secondary
+        ttl: 60000                    # milliseconds
+      shadow:
+        stable: primary               # returns result from this path
+        mirror: secondary             # mirrors this path when triggered
+        mirrorPercentage: 10          # mirror every 10% of calls
 ```
 
-### 2. Service Implementation
+2) Inject and use `DeploymentManager`
 
 ```java
 @Service
 public class UserService {
-    
-    @Autowired
-    private DeploymentManager deploymentManager;
-    
-    public User createUser(String name) {
-        return deploymentManager.canary(
-            () -> createUserV1(name),  // Stable version
-            () -> createUserV2(name),  // New version
-            "user-service"
-        );
-    }
-    
-    private User createUserV1(String name) {
-        // Legacy implementation
-        return new User(name, "v1");
-    }
-    
-    private User createUserV2(String name) {
-        // New implementation
-        return new User(name, "v2");
-    }
+
+  private final DeploymentManager deploymentManager;
+
+  public UserService(DeploymentManager deploymentManager) {
+    this.deploymentManager = deploymentManager;
+  }
+
+  public User createUser(String name) {
+    return deploymentManager.canary(
+        () -> createUserV1(name),  // stable
+        () -> createUserV2(name),  // experimental
+        "user-service"
+    );
+  }
+
+  private User createUserV1(String name) { return new User(name, "v1"); }
+  private User createUserV2(String name) { return new User(name, "v2"); }
 }
 ```
 
-## 🎯 Deployment Stratejileri
+## Deployment Strategies
 
-### Canary Deployment
-Trafiğin belirli bir yüzdesini yeni versiyona yönlendirir.
+### Canary
+Route a percentage of traffic to the experimental version.
 
 ```java
 // %80 stable, %20 experimental
@@ -105,8 +114,8 @@ String result = deploymentManager.canary(
 );
 ```
 
-### Shadow Deployment
-Yeni versiyonu paralel çalıştırır, sonucu stable'dan döner.
+### Shadow
+Execute the experimental path in the background, but always return the stable result to callers. Useful for validating parity and measuring performance.
 
 ```java
 // Stable döner, experimental paralel çalışır
@@ -117,8 +126,12 @@ Integer result = deploymentManager.shadow(
 );
 ```
 
-### Blue/Green Deployment
-TTL tabanlı veya yüzdelik dağılımla version seçimi yapar.
+### Blue/Green
+Choose between two versions using a binary weight selector and/or a TTL cutoff for full switchover.
+The weight accepts only two forms:
+
+- `1/0` → route to primary
+- `0/1` → route to secondary
 
 ```java
 // Primary percentage veya TTL tabanlı seçim
@@ -129,61 +142,67 @@ String result = deploymentManager.blueGreen(
 );
 ```
 
-## ⚙️ Konfigürasyon
+## Configuration
 
-### Tam Konfigürasyon Örneği
+### Full example
 
 ```yaml
 microswitch:
+  enabled: true
   services:
     payment-service:
       enabled: true
       canary:
-        primaryPercentage: 90      # %90 stable, %10 experimental
-        algorithm: "random"        # "random" veya "sequence"
-      shadow:
-        weight: 10                 # Her 10 çağrıda 1 shadow execution
+        percentage: 90/10          # 90% stable, 10% canary
+        algorithm: SEQUENCE        # AlgorithmType enum value
       blueGreen:
-        primaryPercentage: 80      # %80 blue, %20 green
-        ttl: 7200                  # 2 saat sonra tamamen green'e geç
-    
+        weight: 1/0                # 1/0 → primary, 0/1 → secondary
+        ttl: 7200000               # 2 hours in ms
+      shadow:
+        stable: primary
+        mirror: secondary
+        mirrorPercentage: 20       # mirror 20% of the time
+
     user-service:
-      enabled: false               # Devre dışı - sadece stable çalışır
+      enabled: false               # disabled — only stable executes
 ```
 
-### Konfigürasyon Parametreleri
+### Parameters
 
-| Parametre | Açıklama | Varsayılan |
-|-----------|----------|------------|
-| `enabled` | Servis aktif mi? | `true` |
-| `canary.primaryPercentage` | Stable method yüzdesi | `100` |
-| `canary.algorithm` | Dağılım algoritması | `"sequence"` |
-| `shadow.weight` | Shadow execution sıklığı | `5` |
-| `blueGreen.primaryPercentage` | Blue method yüzdesi | `100` |
-| `blueGreen.ttl` | Green'e geçiş süresi (saniye) | `null` |
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `microswitch.enabled` | Master switch for the library | `true` |
+| `services.<key>.enabled` | Whether the service key is active | `true` |
+| `services.<key>.canary.percentage` | Stable/experimental split in slash format (e.g., `80/20`) or a single number meaning stable percentage | `100` |
+| `services.<key>.canary.algorithm` | AlgorithmType enum value (e.g., `SEQUENCE`, `RANDOM`) | `SEQUENCE` |
+| `services.<key>.blueGreen.weight` | Binary selector in slash format: `1/0` (primary) or `0/1` (secondary) | `1/0` |
+| `services.<key>.blueGreen.ttl` | Time to live in milliseconds for route stickiness or switchover logic | `null` |
+| `services.<key>.shadow.stable` | Which method is considered stable (`primary` or `secondary`) | `primary` |
+| `services.<key>.shadow.mirror` | Which method is mirrored (`primary` or `secondary`) | `secondary` |
+| `services.<key>.shadow.mirrorPercentage` | Percentage of calls that will trigger a mirror execution (0–100) | `0` |
 
-## 📊 Metrics ve Monitoring
+## Metrics & Actuator
 
-### Prometheus Metrics
+### Prometheus/Micrometer
 
-Microswitch otomatik olarak aşağıdaki metrikleri toplar:
+If Micrometer is present and a `MeterRegistry` bean exists, Microswitch publishes deployment metrics automatically (e.g., counters per strategy/service/version).
 
 ```
 # Başarılı deployment sayıları
-deployment_success_total{service="user-service",version="stable",strategy="canary"} 85
-deployment_success_total{service="user-service",version="experimental",strategy="canary"} 15
+microswitch_success_total{service="user-service",version="stable",strategy="canary"} 85
+microswitch_success_total{service="user-service",version="experimental",strategy="canary"} 15
 
 # Shadow executions
-deployment_success_total{service="payment-service",version="shadow_execution",strategy="shadow"} 12
+microswitch_success_total{service="payment-service",version="shadow_execution",strategy="shadow"} 12
 ```
 
-### Actuator Endpoints
+### Actuator Endpoint
 
 ```bash
-# Mevcut konfigürasyonu görüntüle
+# View current configuration
 GET /actuator/microswitch
 
-# Örnek response
+# Example response
 {
   "services": {
     "user-service": {
@@ -197,20 +216,27 @@ GET /actuator/microswitch
 }
 ```
 
-## 📚 API Referansı
+## Public API & Module Boundaries
 
-### Public API and Module Boundaries
+Microswitch exposes a single public API surface: `com.microswitch.infrastructure.manager.DeploymentManager`.
 
-Bu kütüphanenin dışarıya açık tek API yüzeyi `com.microswitch.infrastructure.manager.DeploymentManager` sınıfıdır. JPMS (Java Platform Module System) ile yalnızca bu paket export edilmiştir. Diğer tüm paketler (ör. `domain`, `application`, `infrastructure` iç detayları) dış projeler tarafından kullanıma kapalıdır ve geriye dönük uyumluluk garantisi verilmez.
+With JPMS, only this package is exported. Internal packages (e.g., `domain`, `application`, `infrastructure`) are not exported and may change without notice. Even on the classpath, you should only call `DeploymentManager`.
 
-- Export edilen paket: `com.microswitch.infrastructure.manager`
-- Açılan (reflective access için) paketler:
-  - `com.microswitch.application.config` — Spring Boot auto-configuration için
-  - `com.microswitch.infrastructure.external` — Actuator endpoint’leri için
+- Exported: `com.microswitch.infrastructure.manager`
+- Opened (for reflective access):
+  - `com.microswitch.application.config` — Spring Boot auto-configuration
+  - `com.microswitch.infrastructure.external` — Actuator endpoints
 
-Notlar:
-- Bu sınırlar domain/application/infrastructure katmanlarını taşımadan korunur.
-- Tüketici projeler modül yolunu (module-path) kullanıyorsa, yalnızca `DeploymentManager` derleme zamanı erişimine izin verilir. Classpath modunda da bu sözleşmeye uymanız önerilir.
+If you use JPMS (module-path), add Microswitch to your `module-info.java`:
+
+```java
+module your.app.module {
+  requires spring.boot;
+  requires spring.boot.autoconfigure;
+  requires com.n11.development.microswitch; // Microswitch public API
+  // ... other requires
+}
+```
 
 ### DeploymentManager
 
@@ -228,10 +254,10 @@ public class DeploymentManager {
 }
 ```
 
-### Supplier Kullanımı
+### Supplier usage
 
 ```java
-// Method reference (önerilen)
+// Method reference (recommended)
 deploymentManager.canary(this::methodV1, this::methodV2, "service");
 
 // Lambda expression
@@ -241,13 +267,13 @@ deploymentManager.canary(
     "payment"
 );
 
-// Direkt method call (lazy evaluation için önerilmez)
+// Direct method call (not recommended for lazy evaluation)
 // deploymentManager.canary(() -> method1(), () -> method2(), "service");
 ```
 
-## 💡 Örnekler
+## Examples
 
-### E-Commerce Ödeme Sistemi
+### E-Commerce Payment
 
 ```java
 @Service
@@ -279,7 +305,7 @@ public class PaymentService {
 }
 ```
 
-### Kullanıcı Doğrulama
+### User Authentication
 
 ```java
 @Service
@@ -296,7 +322,7 @@ public class AuthService {
         );
     }
     
-    // Shadow: LDAP sonucu döner, OAuth paralel test edilir
+    // Shadow: returns LDAP result, mirrors OAuth in background
     private boolean authenticateWithLDAP(String username, String password) {
         // LDAP authentication
         return ldapService.authenticate(username, password);
@@ -309,7 +335,7 @@ public class AuthService {
 }
 ```
 
-### Veri Analizi
+### Analytics
 
 ```java
 @Service
@@ -326,13 +352,13 @@ public class AnalyticsService {
         );
     }
     
-    // Blue/Green: TTL sonrası tamamen V2'ye geçer
+    // Blue/Green: fully switches to V2 after TTL
 }
 ```
 
-## 🏆 Best Practices
+## Best Practices
 
-### 1. Service Key Naming
+### 1) Service key naming
 ```java
 // ✅ İyi
 "user-registration"
@@ -345,7 +371,7 @@ public class AnalyticsService {
 "temp"
 ```
 
-### 2. Method Reference Kullanımı
+### 2) Prefer method references
 ```java
 // ✅ İyi - Lazy evaluation
 deploymentManager.canary(this::methodV1, this::methodV2, "service");
@@ -354,7 +380,7 @@ deploymentManager.canary(this::methodV1, this::methodV2, "service");
 deploymentManager.canary(() -> methodV1(), () -> methodV2(), "service");
 ```
 
-### 3. Error Handling
+### 3) Error handling
 ```java
 public Result processData(String data) {
     try {
@@ -370,25 +396,23 @@ public Result processData(String data) {
 }
 ```
 
-### 4. Monitoring
+### 4) Monitoring
 ```java
 // Metrics'leri kontrol edin
 @EventListener
 public void onApplicationReady(ApplicationReadyEvent event) {
-    log.info("Microswitch metrics available at /actuator/prometheus");
-    log.info("Microswitch config available at /actuator/microswitch");
+    log.info("Microswitch metrics at /actuator/prometheus");
+    log.info("Microswitch config at /actuator/microswitch");
 }
 ```
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
-### Yaygın Problemler
-
-#### 1. Bean Bulunamıyor
+### 1) Bean not found
 ```
 Error: No qualifying bean of type 'DeploymentManager'
 ```
-**Çözüm**: `@ComponentScan` içinde `com.n11.development` paketini ekleyin.
+Add `com.n11.development` into your `@ComponentScan`.
 
 ```java
 @SpringBootApplication
@@ -448,31 +472,39 @@ public class MicroswitchHealthCheck {
 }
 ```
 
-## 📈 Performans
+## JPMS Module-Info Usage
 
-- **Lazy Evaluation**: Sadece seçilen method çalıştırılır
-- **Minimal Overhead**: ~1ms ek latency
-- **Memory Efficient**: Düşük memory footprint
-- **Thread Safe**: Concurrent execution desteği
+```java
+module com.example.microswitch {
+    requires com.n11.development.microswitch;
+    // ...
+}
+```
 
-## 🤝 Katkıda Bulunma
+## Performance Notes
 
-1. Fork edin
-2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)
-3. Commit yapın (`git commit -m 'Add amazing feature'`)
-4. Push edin (`git push origin feature/amazing-feature`)
-5. Pull Request açın
+- Lazy evaluation: only the selected Supplier executes
+- Minimal overhead added to your call path
+- Thread-safe by design within strategy execution paths
 
-## 📄 Lisans
+## Contributing & Governance
 
-Bu proje MIT lisansı altında lisanslanmıştır. Detaylar için [LICENSE](LICENSE) dosyasına bakın.
+Please see:
 
-## 📞 Destek
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 
-- 📧 Email: development@n11.com
-- 🐛 Issues: [GitHub Issues](https://github.com/n11-development/microswitch/issues)
-- 📖 Docs: [Documentation](DEPLOYMENT_USAGE.md)
+## Security
 
----
+See [SECURITY.md](SECURITY.md) for how to report vulnerabilities.
 
-**Made with ❤️ by N11 Development Team**
+## License (Apache-2.0)
+
+This project is licensed under the Apache License, Version 2.0. See the [LICENSE](LICENSE) file for details, or visit:
+
+https://www.apache.org/licenses/LICENSE-2.0
+
+## Support
+
+- Email: development@n11.com
+- Issues: https://github.com/n11-development/microswitch/issues

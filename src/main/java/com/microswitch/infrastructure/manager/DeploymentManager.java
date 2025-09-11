@@ -31,8 +31,6 @@ import java.util.function.Supplier;
  */
 public final class DeploymentManager {
     
-    // Private field to hide internal implementation details from external consumers
-    // Using Object type to completely hide the internal implementation type
     private final Object strategyExecutor;
     
     /**
@@ -43,7 +41,6 @@ public final class DeploymentManager {
         if (strategyExecutor == null) {
             throw new NullPointerException("Strategy executor must not be null");
         }
-        // Validate that the object is of the correct internal type
         if (!strategyExecutor.getClass().getName().contains("DeploymentStrategyExecutor")) {
             throw new IllegalArgumentException("Invalid strategy executor type");
         }
@@ -104,7 +101,7 @@ public final class DeploymentManager {
      * Executes a blue/green deployment strategy.
      *
      * <p>Blue/Green deployment switches between two complete environments.
-     * It can use percentage-based routing or TTL-based complete switching.
+     * Switching is binary via weight (1/0 or 0/1) and/or time-based using TTL.
      *
      * @param <R>          the return type of both suppliers
      * @param stable       the blue/stable environment function supplier
