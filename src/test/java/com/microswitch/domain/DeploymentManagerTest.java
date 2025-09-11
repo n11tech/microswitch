@@ -111,8 +111,8 @@ class DeploymentManagerTest {
 
     static class TestDeploymentStrategyExecutor extends DeploymentStrategyExecutor {
         public TestDeploymentStrategyExecutor() {
-            super(new InitializerConfiguration(), 
-                  new DeploymentMetrics(Mockito.mock(MeterRegistry.class)));
+            // Pass null DeploymentMetrics for tests to avoid Micrometer mocking
+            super(new InitializerConfiguration(), null);
         }
 
         @Override

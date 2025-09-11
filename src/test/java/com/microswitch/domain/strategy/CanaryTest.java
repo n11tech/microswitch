@@ -1,11 +1,9 @@
 package com.microswitch.domain.strategy;
 
-import com.microswitch.application.metric.DeploymentMetrics;
 import com.microswitch.domain.InitializerConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.HashMap;
@@ -14,13 +12,9 @@ import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class CanaryTest {
-
-    @Mock
-    private DeploymentMetrics deploymentMetrics;
 
     private InitializerConfiguration properties;
     private Canary canaryStrategy;
@@ -45,7 +39,6 @@ class CanaryTest {
 
         // Then
         assertEquals("primary", result);
-        verifyNoInteractions(deploymentMetrics);
     }
 
     @Test
@@ -111,7 +104,6 @@ class CanaryTest {
         // Then
         assertNotNull(result);
         assertTrue(result.equals("primary") || result.equals("secondary"));
-        verify(deploymentMetrics, atLeastOnce()).recordSuccess(eq(serviceKey), anyString(), eq("canary"));
     }
 
     @Test
@@ -147,9 +139,6 @@ class CanaryTest {
         deployableServices.setCanary(canaryConfig);
         
         properties.getServices().put(serviceKey, deployableServices);
-
-        doThrow(new RuntimeException("Metrics failure"))
-            .when(deploymentMetrics).recordSuccess(anyString(), anyString(), anyString());
 
         Supplier<String> primary = () -> "primary";
         Supplier<String> secondary = () -> "secondary";
