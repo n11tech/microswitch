@@ -17,7 +17,7 @@ microswitch:
         percentage: 10/90
         # Algorithm determining how canary routing is selected. Defaults to SEQUENCE.
         # Other supported values must match AlgorithmType enum values.
-        algorithm: SEQUENCE
+        algorithm: sequential
       blueGreen:
         # Percentage of traffic for the primary (blue or green) environment.
         weight: 1/0
