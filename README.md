@@ -196,6 +196,76 @@ microswitch_success_total{service="user-service",version="experimental",strategy
 microswitch_success_total{service="payment-service",version="shadow_execution",strategy="shadow"} 12
 ```
 
+### Prometheus setup (recommended)
+
+Microswitch does not expose a custom Prometheus endpoint. Instead, use Spring Boot Actuator’s built-in `/actuator/prometheus` endpoint. This keeps the library backend-agnostic and simpler for developers.
+
+1) Add dependencies in the consuming app:
+
+```xml
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-actuator</artifactId>
+  <scope>runtime</scope>
+</dependency>
+<dependency>
+  <groupId>io.micrometer</groupId>
+  <artifactId>micrometer-registry-prometheus</artifactId>
+  <scope>runtime</scope>
+</dependency>
+```
+
+2) Expose the Prometheus endpoint:
+
+```yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+```
+
+3) Configure Prometheus to scrape your service:
+
+```yaml
+scrape_configs:
+  - job_name: "microswitch"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["HOST:PORT"]
+```
+
+4) Example PromQL queries using Microswitch counters
+
+Counters are registered as `microswitch.success` / `microswitch.error` and exposed to Prometheus as `microswitch_success_total` / `microswitch_error_total` with tags `service`, `version`, `strategy`.
+
+```promql
+# Per-service, per-strategy success rate (last 5 minutes)
+sum by(service, strategy) (
+  rate(microswitch_success_total[5m])
+) /
+sum by(service, strategy) (
+  rate(microswitch_success_total[5m]) + rate(microswitch_error_total[5m])
+)
+
+# Canary-only success ratio
+sum by(service) (
+  rate(microswitch_success_total{strategy="canary"}[5m])
+) /
+sum by(service) (
+  rate(microswitch_success_total{strategy="canary"}[5m]) + rate(microswitch_error_total{strategy="canary"}[5m])
+)
+
+# Shadow accuracy across stable/experimental
+sum by(service) (
+  rate(microswitch_success_total{strategy="shadow",version=~"stable|experimental"}[5m])
+) /
+sum by(service) (
+  rate(microswitch_success_total{strategy="shadow",version=~"stable|experimental"}[5m]) +
+  rate(microswitch_error_total{strategy="shadow",version=~"stable|experimental"}[5m])
+)
+```
+
 ### Actuator Endpoint
 
 ```bash
