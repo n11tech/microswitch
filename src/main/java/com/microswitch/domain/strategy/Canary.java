@@ -92,12 +92,10 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
     }
 
     private CanaryConfig createCanaryConfig(InitializerConfiguration.Canary canaryConfig, String serviceKey) {
-        // Parse percentage string (e.g., "10/90" means primary=10%, secondary=90%)
         var percentages = parsePercentageString(canaryConfig.getPercentage());
         int primaryPercentage = percentages[0];
         int secondaryPercentage = percentages[1];
         
-        // Safe GCD calculation with overflow protection
         int totalCalls = calculateTotalCalls(primaryPercentage, secondaryPercentage);
         
         AlgorithmType algorithm = parseAlgorithm(canaryConfig.getAlgorithm());
@@ -117,7 +115,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
             }
             return 100 / gcdValue;
         } catch (ArithmeticException e) {
-            logger.warn("GCD calculation failed, using default total calls of 100: " + e.getMessage());
+            logger.warn("GCD calculation failed, using default total calls of 100: {}", e.getMessage());
             return 100;
         }
     }
@@ -195,19 +193,18 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
     
     private AlgorithmType parseAlgorithm(String algorithmString) {
         if (algorithmString == null || algorithmString.trim().isEmpty()) {
-            return AlgorithmType.SEQUENTIAL; // Default
+            return AlgorithmType.SEQUENTIAL;
         }
         
         try {
             return AlgorithmType.valueOf(algorithmString.toUpperCase());
         } catch (IllegalArgumentException e) {
-            // Try to match by string value comparison
             for (AlgorithmType type : AlgorithmType.values()) {
                 if (Objects.equals(algorithmString.toLowerCase(), type.name().toLowerCase())) {
                     return type;
                 }
             }
-            logger.warn("Unknown algorithm type: " + algorithmString + ", defaulting to sequential");
+            logger.warn("Unknown algorithm type: {}, defaulting to sequential", algorithmString);
             return AlgorithmType.SEQUENTIAL;
         }
     }
@@ -230,7 +227,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
             try {
                 return new UniqueRandomGenerator(config.totalCalls());
             } catch (Exception e) {
-                logger.warn("Failed to create UniqueRandomGenerator for service " + serviceKey + ": " + e.getMessage());
+                logger.warn("Failed to create UniqueRandomGenerator for service {}: {}", serviceKey, e.getMessage());
                 return new UniqueRandomGenerator(100);
             }
         });
@@ -242,7 +239,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
                     generator = new UniqueRandomGenerator(config.totalCalls());
                     randomGenerators.put(serviceKey, generator);
                 } catch (Exception e) {
-                    logger.warn("Failed to reset UniqueRandomGenerator for service " + serviceKey + ": " + e.getMessage());
+                    logger.warn("Failed to reset UniqueRandomGenerator for service {}: {}", serviceKey, e.getMessage());
                 }
             }
             randomValue = generator.getNextUniqueRandomValue();
