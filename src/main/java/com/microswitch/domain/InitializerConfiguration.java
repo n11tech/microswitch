@@ -10,6 +10,7 @@ import lombok.Setter;
 public class InitializerConfiguration {
 
     private boolean enabled = true;
+    private String logger = "disable"; // Default: disable execution logging
     private java.util.Map<String, DeployableServices> services = new java.util.HashMap<>();
 
     @Getter
@@ -46,6 +47,7 @@ public class InitializerConfiguration {
         private int percentage = 20;
         private com.microswitch.domain.value.MethodType stable = com.microswitch.domain.value.MethodType.PRIMARY;
         private com.microswitch.domain.value.MethodType mirror = com.microswitch.domain.value.MethodType.SECONDARY;
+        private String comparator = "disable"; // Default: disable deep comparison
 
         // Legacy methods for backward compatibility with Shadow strategy
         public Integer getMirrorPercentage() {

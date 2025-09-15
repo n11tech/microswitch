@@ -19,6 +19,7 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
     private final ExecutorService shadowExecutor;
     private volatile boolean isShutdown = false;
     private final DeepObjectComparator comparator;
+    private final boolean deepComparisonEnabled;
 
     public Shadow(InitializerConfiguration properties) {
         super(properties);
@@ -26,16 +27,42 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
                 Thread.ofVirtual().name("shadow-virtual-", 0).factory()
         );
         
-        // Initialize comparator with optimal strategy for shadow traffic
-        // Using HYBRID strategy for best balance of performance and accuracy
-        this.comparator = DeepObjectComparator.builder()
-                .withStrategy(DeepObjectComparator.ComparisonStrategy.HYBRID)
-                .withMaxDepth(10) // Reasonable depth to prevent stack overflow
-                .compareNullsAsEqual(false) // Treat nulls as different for accurate comparison
-                .ignoreFields("timestamp", "requestId", "traceId") // Ignore common tracking fields
-                .build();
+        this.deepComparisonEnabled = checkIfDeepComparisonEnabled(properties);
+        
+        if (this.deepComparisonEnabled) {
+            this.comparator = DeepObjectComparator.builder()
+                    .withStrategy(DeepObjectComparator.ComparisonStrategy.HYBRID)
+                    .withMaxDepth(10) 
+                    .compareNullsAsEqual(false) 
+                    .ignoreFields("timestamp", "requestId", "traceId") 
+                    .build();
+        } else {
+            this.comparator = null; 
+        }
         
         Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
+    }
+    
+    private boolean checkIfDeepComparisonEnabled(InitializerConfiguration properties) {
+        if (properties.getServices() != null) {
+            for (var service : properties.getServices().values()) {
+                if (service.getShadow() != null && 
+                    "enable".equalsIgnoreCase(service.getShadow().getComparator())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    
+    private boolean isDeepComparisonEnabledForService(String serviceKey) {
+        if (configuration.getServices() != null) {
+            var service = configuration.getServices().get(serviceKey);
+            if (service != null && service.getShadow() != null) {
+                return "enable".equalsIgnoreCase(service.getShadow().getComparator());
+            }
+        }
+        return false;
     }
 
     @Override
@@ -105,18 +132,34 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
 
             if (Objects.isNull(mirrorResult)) {
                 log.warn("Shadow result is null. The shadow function may have thrown an exception or returned null.");
-            } else if (!comparator.areEqual(stableResult, mirrorResult)) {
-                // Deep comparison of objects to validate field-level equality
-                log.warn("Shadow result does not match stable result for service: {}. " +
-                        "Deep comparison detected differences in object fields.", serviceKey);
+            } else {
+                boolean useDeepComparison = isDeepComparisonEnabledForService(serviceKey);
                 
-                // Optional: Log sample differences for debugging (in debug mode)
-                if (log.isDebugEnabled()) {
+                boolean resultsMatch;
+                if (useDeepComparison && comparator != null) {
+                    resultsMatch = comparator.areEqual(stableResult, mirrorResult);
+                    if (!resultsMatch) {
+                        log.warn("Shadow result does not match stable result for service: {}. " +
+                                "Deep comparison detected differences in object fields.", serviceKey);
+                    } else {
+                        log.info("Shadow execution successful - results match for service: {} " +
+                                "(deep comparison validated)", serviceKey);
+                    }
+                } else {
+                    // Use standard equals() method
+                    resultsMatch = stableResult.equals(mirrorResult);
+                    if (!resultsMatch) {
+                        log.warn("Shadow result does not match stable result for service: {} " +
+                                "(using standard equals)", serviceKey);
+                    } else {
+                        log.info("Shadow execution successful - results match for service: {} " +
+                                "(standard comparison)", serviceKey);
+                    }
+                }
+                
+                if (!resultsMatch && log.isDebugEnabled()) {
                     log.debug("Stable result: {}, Mirror result: {}", stableResult, mirrorResult);
                 }
-            } else {
-                log.info("Shadow execution successful - results match for service: {} " +
-                        "(deep comparison validated)", serviceKey);
             }
 
             return stableResult;

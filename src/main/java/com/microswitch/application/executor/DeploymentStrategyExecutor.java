@@ -3,8 +3,7 @@ package com.microswitch.application.executor;
 import com.microswitch.application.metric.DeploymentMetrics;
 import com.microswitch.domain.InitializerConfiguration;
 import com.microswitch.domain.value.StrategyType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.EnumMap;
 import java.util.Map;
@@ -22,9 +21,10 @@ import java.util.function.Supplier;
  * - Interface Segregation: Depends only on DeploymentStrategy.
  * - Dependency Inversion: Strategies are provided via constructor-time hook.
  */
+
+@Slf4j
 public class DeploymentStrategyExecutor {
 
-    private static final Logger log = LoggerFactory.getLogger(DeploymentStrategyExecutor.class);
     private static final String STABLE = "stable";
     private static final String EXPERIMENTAL = "experimental";
 
@@ -156,7 +156,12 @@ public class DeploymentStrategyExecutor {
      */
     private <R> R executeStrategyByType(StrategyType strategyType, Supplier<R> primary, 
                                        Supplier<R> secondary, String serviceKey) {
-        log.debug("Executing {} strategy for service: {}", strategyType.getValue(), serviceKey);
+        if (isExecutionLoggingEnabled()) {
+            log.info("[MICROSWITCH-EXEC] Starting execution - Service: '{}', Strategy: '{}'", 
+                    serviceKey, strategyType.getValue());
+        } else {
+            log.debug("Executing {} strategy for service: {}", strategyType.getValue(), serviceKey);
+        }
         
         return switch (strategyType) {
             case CANARY -> {
@@ -203,6 +208,16 @@ public class DeploymentStrategyExecutor {
             .map(StrategyType::getValue)
             .collect(java.util.stream.Collectors.joining(", "));
     }
+    
+    /**
+     * Checks if detailed execution logging is enabled in the configuration.
+     * 
+     * @return true if logging is enabled, false otherwise
+     */
+    private boolean isExecutionLoggingEnabled() {
+        return properties != null && 
+               "enable".equalsIgnoreCase(properties.getLogger());
+    }
 
     private DeploymentStrategy getRequiredStrategy(StrategyType type) {
         return Optional.ofNullable(strategies.get(type))
@@ -212,18 +227,42 @@ public class DeploymentStrategyExecutor {
     /**
      * Decorate a supplier to record success/error metrics with tags when invoked.
      * If deploymentMetrics is null (no MeterRegistry), returns the original supplier.
+     * Also provides detailed execution logging when enabled.
      */
     private <R> Supplier<R> wrap(Supplier<R> original, String serviceKey, String version, String strategy) {
         if (deploymentMetrics == null || original == null) {
+            // If no metrics, but logging is enabled, still wrap for logging
+            if (isExecutionLoggingEnabled() && original != null) {
+                return () -> {
+                    log.info("[MICROSWITCH-EXEC] Executing - Service: '{}', Strategy: '{}', Method: '{}'",
+                            serviceKey, strategy, version);
+                    R result = original.get();
+                    log.info("[MICROSWITCH-EXEC] Completed - Service: '{}', Strategy: '{}', Method: '{}'",
+                            serviceKey, strategy, version);
+                    return result;
+                };
+            }
             return original;
         }
         return () -> {
             try {
+                if (isExecutionLoggingEnabled()) {
+                    log.info("[MICROSWITCH-EXEC] Executing - Service: '{}', Strategy: '{}', Method: '{}'",
+                            serviceKey, strategy, version);
+                }
                 R result = original.get();
                 deploymentMetrics.recordSuccess(serviceKey, version, strategy);
+                if (isExecutionLoggingEnabled()) {
+                    log.info("[MICROSWITCH-EXEC] Completed - Service: '{}', Strategy: '{}', Method: '{}' (Success)",
+                            serviceKey, strategy, version);
+                }
                 return result;
             } catch (RuntimeException e) {
                 deploymentMetrics.recordError(serviceKey, version, strategy);
+                if (isExecutionLoggingEnabled()) {
+                    log.error("[MICROSWITCH-EXEC] Failed - Service: '{}', Strategy: '{}', Method: '{}' - Error: {}",
+                            serviceKey, strategy, version, e.getMessage());
+                }
                 throw e;
             }
         };

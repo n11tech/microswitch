@@ -42,7 +42,7 @@ Maven
 <dependency>
   <groupId>com.n11.development</groupId>
   <artifactId>microswitch</artifactId>
-  <version>1.1.0</version>
+  <version>1.1.1</version>
   <scope>compile</scope>
 </dependency>
 ```
@@ -50,7 +50,7 @@ Maven
 Gradle
 
 ```gradle
-implementation 'com.n11.development:microswitch:1.1.0'
+implementation 'com.n11.development:microswitch:1.1.1'
 ```
 
 ## Quick Start
@@ -74,6 +74,7 @@ microswitch:
         stable: primary               # returns result from this path
         mirror: secondary             # mirrors this path when triggered
         mirrorPercentage: 10          # mirror every 10% of calls
+        comparator: disable           # NEW in v1.1.1: deep object comparison (enable/disable)
 ```
 
 2) Inject and use `DeploymentManager`
@@ -147,6 +148,55 @@ String result = deploymentManager.blueGreen(
 );
 ```
 
+## Release Notes
+
+### Version 1.1.1 (Latest)
+
+#### New Features
+
+##### 1. Execution Logging
+Detailed execution logging to track service key, strategy, and method execution:
+
+```yaml
+microswitch:
+  logger: enable  # Enable detailed execution logging (default: disable)
+```
+
+When enabled, logs include:
+- `[MICROSWITCH-EXEC] Starting execution - Service: 'X', Strategy: 'Y'`
+- `[MICROSWITCH-EXEC] Executing - Service: 'X', Strategy: 'Y', Method: 'stable/experimental'`
+- `[MICROSWITCH-EXEC] Completed - Service: 'X', Strategy: 'Y', Method: 'Z' (Success)`
+- `[MICROSWITCH-EXEC] Failed - Service: 'X', Strategy: 'Y', Method: 'Z' - Error: ...`
+
+##### 2. Deep Object Comparison for Shadow Strategy
+Configurable deep object comparison for shadow traffic validation:
+
+```yaml
+microswitch:
+  services:
+    order-service:
+      shadow:
+        comparator: enable  # Enable deep object comparison (default: disable)
+```
+
+When enabled:
+- Compares objects by field values rather than reference equality
+- Supports nested objects, collections, maps, and arrays
+- Uses HYBRID strategy: checks for overridden equals() first, falls back to field comparison
+- Automatically ignores common tracking fields (timestamp, requestId, traceId)
+
+#### Benefits
+- **Better Observability**: Track exactly which service, strategy, and method are executing
+- **Accurate Shadow Validation**: Compare actual object content, not just references
+- **Zero Code Changes**: Both features are configuration-driven
+- **Performance Optimized**: No impact when disabled (default)
+
+### Version 1.1.0
+
+- **Configuration-Driven Deployment**: New `execute()` method for runtime strategy switching
+- **Deprecated Legacy Methods**: `canary()`, `shadow()`, `blueGreen()` marked for removal in v2.0.0
+- **Active Strategy Configuration**: Added `activeStrategy` field to service configuration
+
 ## Configuration-Driven Deployment (New in v1.1.0)
 
 Starting with version 1.1.0, Microswitch supports configuration-driven strategy selection using the new `execute()` method. This allows you to change deployment strategies at runtime without code changes.
@@ -217,6 +267,7 @@ microswitch:
         stable: primary
         mirror: secondary
         mirrorPercentage: 20       # mirror 20% of the time
+        comparator: disable        # NEW v1.1.1: deep object comparison (enable/disable)
 
     user-service:
       enabled: false               # disabled — only stable executes
@@ -226,6 +277,7 @@ microswitch:
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
+| `microswitch.logger` | **NEW v1.1.1**: Enable/disable detailed execution logging | `disable` |
 | `microswitch.enabled` | Master switch for the library | `true` |
 | `services.<key>.enabled` | Whether the service key is active | `true` |
 | `services.<key>.activeStrategy` | **NEW v1.1.0**: Active strategy for configuration-driven deployment (`canary`, `shadow`, `blueGreen`) | `canary` |
@@ -236,6 +288,7 @@ microswitch:
 | `services.<key>.shadow.stable` | Which method is considered stable (`primary` or `secondary`) | `primary` |
 | `services.<key>.shadow.mirror` | Which method is mirrored (`primary` or `secondary`) | `secondary` |
 | `services.<key>.shadow.mirrorPercentage` | Percentage of calls that will trigger a mirror execution (0–100) | `0` |
+| `services.<key>.shadow.comparator` | **NEW v1.1.1**: Enable/disable deep object comparison for shadow validation | `disable` |
 
 ## Metrics & Actuator
 

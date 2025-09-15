@@ -5,6 +5,10 @@
 microswitch:
   # Master switch for the library. If false, all strategies are disabled by default.
   enabled: true
+  # Enable/disable detailed logging of service key, strategy, and method execution.
+  # When enabled, logs which service, strategy, and method (primary/secondary) are being executed.
+  # Default: disable (no detailed execution logging)
+  logger: disable
 
   # Map of service configurations by service key/name.
   # Replace example keys (order-service, payment-service) with your actual service identifiers.
@@ -29,6 +33,10 @@ microswitch:
         stable: primary
         mirror: secondary
         mirrorPercentage: 10
+        # Enable/disable deep object comparison for shadow traffic validation.
+        # When enabled, compares objects by field values rather than reference equality.
+        # Default: disable (uses standard equals() method)
+        comparator: disable
 
 # You can override any of these values per environment using Spring profiles,
 # e.g., create application-dev.yml and application-prod.yml and place overrides there.
