@@ -115,7 +115,7 @@ class ConfigurationDrivenDeploymentTest {
         // Create service without activeStrategy
         InitializerConfiguration.DeployableServices serviceWithoutStrategy = new InitializerConfiguration.DeployableServices();
         serviceWithoutStrategy.setEnabled(true);
-        // No activeStrategy set
+        serviceWithoutStrategy.setActiveStrategy(null); // Explicitly set to null to trigger exception
         
         configuration.getServices().put("no-strategy-service", serviceWithoutStrategy);
         

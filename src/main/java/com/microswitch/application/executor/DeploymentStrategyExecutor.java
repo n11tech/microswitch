@@ -3,6 +3,8 @@ package com.microswitch.application.executor;
 import com.microswitch.application.metric.DeploymentMetrics;
 import com.microswitch.domain.InitializerConfiguration;
 import com.microswitch.domain.value.StrategyType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.EnumMap;
 import java.util.Map;
@@ -22,6 +24,7 @@ import java.util.function.Supplier;
  */
 public class DeploymentStrategyExecutor {
 
+    private static final Logger log = LoggerFactory.getLogger(DeploymentStrategyExecutor.class);
     private static final String STABLE = "stable";
     private static final String EXPERIMENTAL = "experimental";
 
@@ -80,6 +83,11 @@ public class DeploymentStrategyExecutor {
 
     /**
      * Executes deployment strategy based on the activeStrategy configuration for the given service.
+     * 
+     * <p>This method follows SOLID principles:
+     * - Single Responsibility: Delegates strategy execution to appropriate handlers
+     * - Open/Closed: New strategies can be added by extending StrategyType enum
+     * - Dependency Inversion: Depends on StrategyType abstraction, not concrete strings
      *
      * @param primary the stable/primary function supplier
      * @param secondary the experimental/secondary function supplier
@@ -89,36 +97,90 @@ public class DeploymentStrategyExecutor {
      * @throws IllegalStateException if activeStrategy value is invalid or strategy is not registered
      */
     public <R> R executeByActiveStrategy(Supplier<R> primary, Supplier<R> secondary, String serviceKey) {
-        if (serviceKey == null || serviceKey.trim().isEmpty()) {
-            throw new IllegalArgumentException("Service key must not be null or empty");
-        }
-
-        String activeStrategy = getActiveStrategy(serviceKey);
-        if (activeStrategy == null || activeStrategy.trim().isEmpty()) {
-            throw new IllegalArgumentException("Active strategy not configured for service: " + serviceKey);
-        }
-
-        switch (activeStrategy.toLowerCase().trim()) {
-            case "canary":
-                return executeCanary(primary, secondary, serviceKey);
-            case "shadow":
-                return executeShadow(primary, secondary, serviceKey);
-            case "bluegreen":
-            case "blue-green":
-                return executeBlueGreen(primary, secondary, serviceKey);
-            default:
-                throw new IllegalStateException("Invalid active strategy '" + activeStrategy + 
-                    "' for service '" + serviceKey + "'. Valid values are: canary, shadow, blueGreen");
-        }
+        validateServiceKey(serviceKey);
+        
+        StrategyType strategyType = resolveActiveStrategy(serviceKey);
+        
+        return executeStrategyByType(strategyType, primary, secondary, serviceKey);
     }
 
     /**
-     * Retrieves the active strategy configuration for the given service key.
+     * Validates the service key parameter.
+     * 
+     * @param serviceKey the service key to validate
+     * @throws IllegalArgumentException if serviceKey is null or empty
+     */
+    private void validateServiceKey(String serviceKey) {
+        if (serviceKey == null || serviceKey.trim().isEmpty()) {
+            throw new IllegalArgumentException("Service key must not be null or empty");
+        }
+    }
+    
+    /**
+     * Resolves the active strategy for the given service key.
+     * 
+     * @param serviceKey the service key to look up
+     * @return the resolved StrategyType
+     * @throws IllegalArgumentException if activeStrategy is not configured or invalid
+     */
+    private StrategyType resolveActiveStrategy(String serviceKey) {
+        String activeStrategyValue = getActiveStrategyValue(serviceKey);
+        
+        if (activeStrategyValue == null || activeStrategyValue.trim().isEmpty()) {
+            throw new IllegalArgumentException("Active strategy not configured for service: " + serviceKey);
+        }
+        
+        try {
+            return StrategyType.fromValue(activeStrategyValue.trim());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                "Invalid active strategy '" + activeStrategyValue + "' for service '" + serviceKey + 
+                "'. Valid values are: " + getValidStrategyValues(), e);
+        }
+    }
+    
+    /**
+     * Executes the strategy based on the resolved StrategyType using Java 21 enhanced switch expressions.
+     * 
+     * <p>This method demonstrates Java 21 best practices:
+     * - Enhanced switch expressions with yield statements
+     * - Exhaustive pattern matching
+     * - Clear separation of concerns
+     * - Proper logging for operational visibility
+     * 
+     * @param strategyType the strategy type to execute
+     * @param primary the stable/primary function supplier
+     * @param secondary the experimental/secondary function supplier
+     * @param serviceKey the unique identifier for service configuration
+     * @return the result from the selected strategy execution
+     */
+    private <R> R executeStrategyByType(StrategyType strategyType, Supplier<R> primary, 
+                                       Supplier<R> secondary, String serviceKey) {
+        log.debug("Executing {} strategy for service: {}", strategyType.getValue(), serviceKey);
+        
+        return switch (strategyType) {
+            case CANARY -> {
+                log.trace("Delegating to canary strategy execution for service: {}", serviceKey);
+                yield executeCanary(primary, secondary, serviceKey);
+            }
+            case SHADOW -> {
+                log.trace("Delegating to shadow strategy execution for service: {}", serviceKey);
+                yield executeShadow(primary, secondary, serviceKey);
+            }
+            case BLUE_GREEN -> {
+                log.trace("Delegating to blue-green strategy execution for service: {}", serviceKey);
+                yield executeBlueGreen(primary, secondary, serviceKey);
+            }
+        };
+    }
+    
+    /**
+     * Retrieves the active strategy configuration value for the given service key.
      *
      * @param serviceKey the service key to look up
      * @return the active strategy name, or null if not configured
      */
-    private String getActiveStrategy(String serviceKey) {
+    private String getActiveStrategyValue(String serviceKey) {
         if (properties == null || properties.getServices() == null) {
             return null;
         }
@@ -129,6 +191,17 @@ public class DeploymentStrategyExecutor {
         }
         
         return serviceConfig.getActiveStrategy();
+    }
+    
+    /**
+     * Returns a comma-separated string of valid strategy values for error messages.
+     * 
+     * @return valid strategy values as a string
+     */
+    private String getValidStrategyValues() {
+        return java.util.Arrays.stream(StrategyType.values())
+            .map(StrategyType::getValue)
+            .collect(java.util.stream.Collectors.joining(", "));
     }
 
     private DeploymentStrategy getRequiredStrategy(StrategyType type) {
