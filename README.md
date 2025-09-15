@@ -32,7 +32,7 @@ This README explains how to add Microswitch to your project, configure it, and u
 ## Requirements
 
 - Java 21+
-- Spring Boot 3.5.x
+- Spring Boot 3.5.5+
 
 ## Installation
 
@@ -42,7 +42,7 @@ Maven
 <dependency>
   <groupId>com.n11.development</groupId>
   <artifactId>microswitch</artifactId>
-  <version>1.0.0</version>
+  <version>1.1.0</version>
   <scope>compile</scope>
 </dependency>
 ```
@@ -50,7 +50,7 @@ Maven
 Gradle
 
 ```gradle
-implementation 'com.n11.development:microswitch:1.0.0'
+implementation 'com.n11.development:microswitch:1.1.0'
 ```
 
 ## Quick Start
@@ -63,6 +63,7 @@ microswitch:
   services:
     user-service:
       enabled: true
+      activeStrategy: canary          # NEW in v1.1.0: configuration-driven strategy selection
       canary:
         percentage: 80/20             # stable/experimental split
         algorithm: SEQUENCE           # AlgorithmType enum (e.g., SEQUENCE, RANDOM)
@@ -88,11 +89,15 @@ public class UserService {
   }
 
   public User createUser(String name) {
-    return deploymentManager.canary(
+    // NEW in v1.1.0: Configuration-driven strategy selection
+    return deploymentManager.execute(
         () -> createUserV1(name),  // stable
         () -> createUserV2(name),  // experimental
-        "user-service"
+        "user-service"             // uses activeStrategy from config
     );
+    
+    // Legacy approach (still supported but deprecated)
+    // return deploymentManager.canary(() -> createUserV1(name), () -> createUserV2(name), "user-service");
   }
 
   private User createUserV1(String name) { return new User(name, "v1"); }
@@ -142,6 +147,56 @@ String result = deploymentManager.blueGreen(
 );
 ```
 
+## Configuration-Driven Deployment (New in v1.1.0)
+
+Starting with version 1.1.0, Microswitch supports configuration-driven strategy selection using the new `execute()` method. This allows you to change deployment strategies at runtime without code changes.
+
+### Benefits
+
+- **Runtime Strategy Switching**: Change strategies via configuration updates without redeployment
+- **Centralized Management**: All strategy decisions in one place (application.yml)
+- **Operational Flexibility**: Switch from canary to blue-green to shadow based on operational needs
+- **A/B Testing**: Easy strategy comparison for the same service
+
+### Usage
+
+```java
+// Configuration-driven approach (recommended)
+String result = deploymentManager.execute(
+    this::stableMethod,
+    this::experimentalMethod,
+    "service-key"  // Strategy determined by activeStrategy in config
+);
+```
+
+### Configuration
+
+```yaml
+microswitch:
+  services:
+    payment-service:
+      activeStrategy: canary    # Options: canary, shadow, blueGreen
+      canary:
+        percentage: 90/10
+      shadow:
+        mirrorPercentage: 20
+      blueGreen:
+        weight: 1/0
+        ttl: 300000
+```
+
+### Migration from Legacy Methods
+
+The legacy strategy-specific methods (`canary()`, `shadow()`, `blueGreen()`) are still supported but deprecated:
+
+```java
+// ❌ Deprecated (will be removed in v2.0.0)
+deploymentManager.canary(stable, experimental, "service");
+
+// ✅ Recommended (configuration-driven)
+deploymentManager.execute(stable, experimental, "service");
+```
+
 ## Configuration
 
 ### Full example
@@ -173,6 +228,7 @@ microswitch:
 |-----------|-------------|---------|
 | `microswitch.enabled` | Master switch for the library | `true` |
 | `services.<key>.enabled` | Whether the service key is active | `true` |
+| `services.<key>.activeStrategy` | **NEW v1.1.0**: Active strategy for configuration-driven deployment (`canary`, `shadow`, `blueGreen`) | `canary` |
 | `services.<key>.canary.percentage` | Stable/experimental split in slash format (e.g., `80/20`) or a single number meaning stable percentage | `100` |
 | `services.<key>.canary.algorithm` | AlgorithmType enum value (e.g., `SEQUENCE`, `RANDOM`) | `SEQUENCE` |
 | `services.<key>.blueGreen.weight` | Binary selector in slash format: `1/0` (primary) or `0/1` (secondary) | `1/0` |
@@ -325,13 +381,17 @@ module your.app.module {
 ```java
 public class DeploymentManager {
     
-    // Canary deployment
+    // Configuration-driven deployment (NEW in v1.1.0)
+    public <R> R execute(Supplier<R> primary, Supplier<R> secondary, String serviceKey);
+    
+    // Legacy strategy-specific methods (deprecated in v1.1.0)
+    @Deprecated(since = "1.1.0", forRemoval = true)
     public <R> R canary(Supplier<R> stable, Supplier<R> experimental, String serviceKey);
     
-    // Shadow deployment  
+    @Deprecated(since = "1.1.0", forRemoval = true)
     public <R> R shadow(Supplier<R> stable, Supplier<R> experimental, String serviceKey);
     
-    // Blue/Green deployment
+    @Deprecated(since = "1.1.0", forRemoval = true)
     public <R> R blueGreen(Supplier<R> blue, Supplier<R> green, String serviceKey);
 }
 ```
@@ -339,18 +399,18 @@ public class DeploymentManager {
 ### Supplier usage
 
 ```java
-// Method reference (recommended)
-deploymentManager.canary(this::methodV1, this::methodV2, "service");
+// Method reference (recommended with new execute method)
+deploymentManager.execute(this::methodV1, this::methodV2, "service");
 
-// Lambda expression
-deploymentManager.canary(
+// Lambda expression (configuration-driven)
+deploymentManager.execute(
     () -> processPayment(request),
     () -> processPaymentNew(request),
     "payment"
 );
 
-// Direct method call (not recommended for lazy evaluation)
-// deploymentManager.canary(() -> method1(), () -> method2(), "service");
+// Legacy approach (deprecated)
+// deploymentManager.canary(this::methodV1, this::methodV2, "service");
 ```
 
 ## Examples
@@ -366,10 +426,11 @@ public class PaymentService {
     private DeploymentManager deploymentManager;
     
     public PaymentResult processPayment(PaymentRequest request) {
-        return deploymentManager.canary(
+        // Configuration-driven approach (v1.1.0+)
+        return deploymentManager.execute(
             () -> processWithOldProvider(request),
             () -> processWithNewProvider(request),
-            "payment-processing"
+            "payment-processing"  // Strategy determined by activeStrategy in config
         );
     }
     
@@ -397,10 +458,11 @@ public class AuthService {
     private DeploymentManager deploymentManager;
     
     public boolean authenticateUser(String username, String password) {
-        return deploymentManager.shadow(
+        // Configuration-driven approach (v1.1.0+)
+        return deploymentManager.execute(
             () -> authenticateWithLDAP(username, password),
             () -> authenticateWithOAuth(username, password),
-            "user-auth"
+            "user-auth"  // Strategy determined by activeStrategy in config
         );
     }
     
@@ -427,10 +489,11 @@ public class AnalyticsService {
     private DeploymentManager deploymentManager;
     
     public AnalyticsReport generateReport(String userId) {
-        return deploymentManager.blueGreen(
+        // Configuration-driven approach (v1.1.0+)
+        return deploymentManager.execute(
             () -> generateReportV1(userId),
             () -> generateReportV2(userId),
-            "analytics-report"
+            "analytics-report"  // Strategy determined by activeStrategy in config
         );
     }
     
@@ -453,20 +516,29 @@ public class AnalyticsService {
 "temp"
 ```
 
-### 2) Prefer method references
+### 2) Use configuration-driven approach
 ```java
-// ✅ İyi - Lazy evaluation
-deploymentManager.canary(this::methodV1, this::methodV2, "service");
+// ✅ Recommended - Configuration-driven (v1.1.0+)
+deploymentManager.execute(this::methodV1, this::methodV2, "service");
 
-// ❌ Kötü - Eager evaluation
-deploymentManager.canary(() -> methodV1(), () -> methodV2(), "service");
+// ❌ Deprecated - Strategy-specific methods
+deploymentManager.canary(this::methodV1, this::methodV2, "service");
 ```
 
-### 3) Error handling
+### 3) Prefer method references
+```java
+// ✅ Good - Lazy evaluation
+deploymentManager.execute(this::methodV1, this::methodV2, "service");
+
+// ❌ Bad - Eager evaluation
+deploymentManager.execute(() -> methodV1(), () -> methodV2(), "service");
+```
+
+### 4) Error handling
 ```java
 public Result processData(String data) {
     try {
-        return deploymentManager.canary(
+        return deploymentManager.execute(
             () -> processV1(data),
             () -> processV2(data),
             "data-processing"
@@ -478,9 +550,9 @@ public Result processData(String data) {
 }
 ```
 
-### 4) Monitoring
+### 5) Monitoring
 ```java
-// Metrics'leri kontrol edin
+// Check metrics and configuration
 @EventListener
 public void onApplicationReady(ApplicationReadyEvent event) {
     log.info("Microswitch metrics at /actuator/prometheus");
@@ -541,7 +613,7 @@ public class MicroswitchHealthCheck {
     @EventListener
     public void checkHealth(ApplicationReadyEvent event) {
         try {
-            String result = deploymentManager.canary(
+            String result = deploymentManager.execute(
                 () -> "healthy",
                 () -> "healthy",
                 "health-check"

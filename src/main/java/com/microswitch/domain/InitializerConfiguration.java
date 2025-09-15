@@ -1,56 +1,165 @@
 package com.microswitch.domain;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.microswitch.domain.value.AlgorithmType;
-import com.microswitch.domain.value.MethodType;
-import lombok.Getter;
-import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import java.util.Map;
-
-@Getter
-@Setter
 @ConfigurationProperties(prefix = "microswitch")
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public class InitializerConfiguration {
 
     private boolean enabled = true;
-    private Map<String, DeployableServices> services;
+    private java.util.Map<String, DeployableServices> services = new java.util.HashMap<>();
 
-    @Getter
-    @Setter
-    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public java.util.Map<String, DeployableServices> getServices() {
+        return services;
+    }
+
+    public void setServices(java.util.Map<String, DeployableServices> services) {
+        this.services = services;
+    }
+
     public static class DeployableServices {
         private boolean enabled = true;
-        private String activeStrategy;
-        private Canary canary;
-        private BlueGreen blueGreen;
-        private Shadow shadow;
+        private String activeStrategy = "canary";
+        private Canary canary = new Canary();
+        private BlueGreen blueGreen = new BlueGreen();
+        private Shadow shadow = new Shadow();
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getActiveStrategy() {
+            return activeStrategy;
+        }
+
+        public void setActiveStrategy(String activeStrategy) {
+            this.activeStrategy = activeStrategy;
+        }
+
+        public Canary getCanary() {
+            return canary;
+        }
+
+        public void setCanary(Canary canary) {
+            this.canary = canary;
+        }
+
+        public BlueGreen getBlueGreen() {
+            return blueGreen;
+        }
+
+        public void setBlueGreen(BlueGreen blueGreen) {
+            this.blueGreen = blueGreen;
+        }
+
+        public Shadow getShadow() {
+            return shadow;
+        }
+
+        public void setShadow(Shadow shadow) {
+            this.shadow = shadow;
+        }
     }
 
-    @Getter
-    @Setter
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class Canary {
-        private String percentage;
-        private String algorithm = AlgorithmType.SEQUENTIAL.getValue().toLowerCase();
+        private String percentage = "50/50";
+        private String algorithm = "sequential";
+
+        public String getPercentage() {
+            return percentage;
+        }
+
+        public void setPercentage(String percentage) {
+            this.percentage = percentage;
+        }
+
+        public String getAlgorithm() {
+            return algorithm;
+        }
+
+        public void setAlgorithm(String algorithm) {
+            this.algorithm = algorithm;
+        }
     }
 
-    @Getter
-    @Setter
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class BlueGreen {
-        private String weight;
-        private Long ttl;
+        private String weight = "1/0";
+        private int ttl = 300;
+
+        public String getWeight() {
+            return weight;
+        }
+
+        public void setWeight(String weight) {
+            this.weight = weight;
+        }
+
+        public int getTtl() {
+            return ttl;
+        }
+
+        public void setTtl(int ttl) {
+            this.ttl = ttl;
+        }
+
+        public void setTtl(long ttl) {
+            this.ttl = (int) ttl;
+        }
     }
 
-    @Getter
-    @Setter
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class Shadow {
-        private MethodType stable;
-        private MethodType mirror;
-        private Short mirrorPercentage;
+        private int percentage = 20;
+
+        public int getPercentage() {
+            return percentage;
+        }
+
+        public void setPercentage(int percentage) {
+            this.percentage = percentage;
+        }
+
+        // Legacy methods for backward compatibility with Shadow strategy
+        public Integer getMirrorPercentage() {
+            return percentage;
+        }
+
+        public void setMirrorPercentage(Integer mirrorPercentage) {
+            this.percentage = mirrorPercentage != null ? mirrorPercentage : 20;
+        }
+
+        public void setMirrorPercentage(short mirrorPercentage) {
+            this.percentage = mirrorPercentage;
+        }
+
+        public void setMirrorPercentage(Short mirrorPercentage) {
+            this.percentage = mirrorPercentage != null ? mirrorPercentage : 20;
+        }
+
+        public com.microswitch.domain.value.MethodType getStable() {
+            return com.microswitch.domain.value.MethodType.PRIMARY;
+        }
+
+        public void setStable(com.microswitch.domain.value.MethodType stable) {
+            // No-op for now, always use PRIMARY as stable
+        }
+
+        public com.microswitch.domain.value.MethodType getMirror() {
+            return com.microswitch.domain.value.MethodType.SECONDARY;
+        }
+
+        public void setMirror(com.microswitch.domain.value.MethodType mirror) {
+            // No-op for now, always use SECONDARY as mirror
+        }
     }
 }

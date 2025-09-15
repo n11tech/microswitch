@@ -158,7 +158,7 @@ class DeploymentStrategyExecutorTest {
 
         String result = executor.executeBlueGreen(() -> "blue", () -> "green", "svc5");
         assertEquals("blue", result);
-        verify(deploymentMetrics).recordSuccess("svc5", "stable", "blue_green");
-        verify(deploymentMetrics, never()).recordSuccess("svc5", "experimental", "blue_green");
+        verify(deploymentMetrics).recordSuccess("svc5", "stable", "blueGreen");
+        verify(deploymentMetrics, never()).recordSuccess("svc5", "experimental", "blueGreen");
     }
 }
