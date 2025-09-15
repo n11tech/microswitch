@@ -137,8 +137,26 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
     private Long extractTtl(Object blueGreenSection) {
         try {
             var method = blueGreenSection.getClass().getMethod("getTtl");
-            return (Long) method.invoke(blueGreenSection);
+            Object result = method.invoke(blueGreenSection);
+            switch (result) {
+                case null -> {
+                    return null;
+                }
+
+                // Handle both Integer and Long types
+                case Integer i -> {
+                    return i.longValue();
+                }
+                case Long l -> {
+                    return l;
+                }
+                default -> {
+                    log.warn("Unexpected TTL type: {}, expected Integer or Long", result.getClass());
+                    return null;
+                }
+            }
         } catch (Exception e) {
+            log.debug("Failed to extract TTL from configuration: {}", e.getMessage());
             return null;
         }
     }
@@ -210,6 +228,11 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
         );
 
         Instant startTime = startTimeRef.get();
+        if (startTime == null) {
+            startTime = Instant.now();
+            startTimeRef.set(startTime);
+        }
+
         long elapsedSeconds = Duration.between(startTime, Instant.now()).toSeconds();
 
         if (elapsedSeconds >= ttl) {
