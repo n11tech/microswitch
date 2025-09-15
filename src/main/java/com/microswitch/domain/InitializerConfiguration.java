@@ -120,6 +120,8 @@ public class InitializerConfiguration {
 
     public static class Shadow {
         private int percentage = 20;
+        private com.microswitch.domain.value.MethodType stable = com.microswitch.domain.value.MethodType.PRIMARY;
+        private com.microswitch.domain.value.MethodType mirror = com.microswitch.domain.value.MethodType.SECONDARY;
 
         public int getPercentage() {
             return percentage;
@@ -147,19 +149,19 @@ public class InitializerConfiguration {
         }
 
         public com.microswitch.domain.value.MethodType getStable() {
-            return com.microswitch.domain.value.MethodType.PRIMARY;
+            return stable;
         }
 
         public void setStable(com.microswitch.domain.value.MethodType stable) {
-            // No-op for now, always use PRIMARY as stable
+            this.stable = stable != null ? stable : com.microswitch.domain.value.MethodType.PRIMARY;
         }
 
         public com.microswitch.domain.value.MethodType getMirror() {
-            return com.microswitch.domain.value.MethodType.SECONDARY;
+            return mirror;
         }
 
         public void setMirror(com.microswitch.domain.value.MethodType mirror) {
-            // No-op for now, always use SECONDARY as mirror
+            this.mirror = mirror != null ? mirror : com.microswitch.domain.value.MethodType.SECONDARY;
         }
     }
 }

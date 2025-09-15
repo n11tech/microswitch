@@ -35,8 +35,12 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
         }
 
         var shadowConfig = serviceConfig.getShadow();
+        
         if (shadowConfig == null || shadowConfig.getMirrorPercentage() == null || shadowConfig.getMirrorPercentage() <= 0) {
-            return primary.get();
+            if (shadowConfig == null) {
+                return primary.get();
+            }
+            return executeStableMethod(primary, secondary, shadowConfig);
         }
 
         var mirrorPercentage = shadowConfig.getMirrorPercentage();
