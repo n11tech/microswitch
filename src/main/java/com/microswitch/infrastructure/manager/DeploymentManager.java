@@ -9,6 +9,9 @@ import java.util.function.Supplier;
  * such as Canary, Shadow, and Blue/Green deployments. It delegates the actual
  * strategy execution to an internal executor without exposing implementation details.
  *
+ * <p>The deployment strategy is determined by the configuration (activeStrategy)
+ * for each service, allowing for configuration-driven deployment management.
+ *
  * <p>All methods use lazy evaluation through {@link Supplier} parameters,
  * ensuring that only the selected deployment path is executed.
  *
@@ -18,7 +21,7 @@ import java.util.function.Supplier;
  * private DeploymentManager deploymentManager;
  *
  * public String processPayment(PaymentRequest request) {
- *     return deploymentManager.canary(
+ *     return deploymentManager.execute(
  *         () -> legacyPaymentService.process(request),
  *         () -> newPaymentService.process(request),
  *         "payment-service"
@@ -61,6 +64,23 @@ public final class DeploymentManager {
 
     
     /**
+     * Executes the configured deployment strategy for the specified service.
+     *
+     * <p>The deployment strategy (canary, shadow, or blueGreen) is determined
+     * by the 'activeStrategy' configuration for the given serviceKey.
+     *
+     * @param <R>          the return type of both suppliers
+     * @param stable       the stable/primary function supplier
+     * @param experimental the experimental/secondary function supplier
+     * @param serviceKey   the unique identifier for service configuration
+     * @return the result from the selected supplier execution based on active strategy
+     * @throws IllegalArgumentException if serviceKey is null or empty, or if activeStrategy is not configured
+     */
+    public <R> R execute(Supplier<R> stable, Supplier<R> experimental, String serviceKey) {
+        return invokeStrategy("executeByActiveStrategy", stable, experimental, serviceKey);
+    }
+
+    /**
      * Executes a canary deployment strategy.
      *
      * <p>Canary deployment gradually shifts traffic from the stable version
@@ -72,7 +92,9 @@ public final class DeploymentManager {
      * @param serviceKey   the unique identifier for service configuration
      * @return the result from the selected supplier execution
      * @throws IllegalArgumentException if serviceKey is null or empty
+     * @deprecated Use {@link #execute(Supplier, Supplier, String)} with activeStrategy configuration instead
      */
+    @Deprecated(since = "1.1.0", forRemoval = true)
     public <R> R canary(Supplier<R> stable, Supplier<R> experimental, String serviceKey) {
         return invokeStrategy("executeCanary", stable, experimental, serviceKey);
     }
@@ -91,7 +113,9 @@ public final class DeploymentManager {
      * @param serviceKey   the unique identifier for service configuration
      * @return the result from the stable supplier execution
      * @throws IllegalArgumentException if serviceKey is null or empty
+     * @deprecated Use {@link #execute(Supplier, Supplier, String)} with activeStrategy configuration instead
      */
+    @Deprecated(since = "1.1.0", forRemoval = true)
     public <R> R shadow(Supplier<R> stable, Supplier<R> experimental, String serviceKey) {
         return invokeStrategy("executeShadow", stable, experimental, serviceKey);
     }
@@ -109,7 +133,9 @@ public final class DeploymentManager {
      * @param serviceKey   the unique identifier for service configuration
      * @return the result from the selected supplier execution
      * @throws IllegalArgumentException if serviceKey is null or empty
+     * @deprecated Use {@link #execute(Supplier, Supplier, String)} with activeStrategy configuration instead
      */
+    @Deprecated(since = "1.1.0", forRemoval = true)
     public <R> R blueGreen(Supplier<R> stable, Supplier<R> experimental, String serviceKey) {
         return invokeStrategy("executeBlueGreen", stable, experimental, serviceKey);
     }

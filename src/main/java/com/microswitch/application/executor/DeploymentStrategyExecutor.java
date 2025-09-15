@@ -27,14 +27,15 @@ public class DeploymentStrategyExecutor {
 
     private final Map<StrategyType, DeploymentStrategy> strategies = new EnumMap<>(StrategyType.class);
     private final DeploymentMetrics deploymentMetrics; // may be null if no MeterRegistry
+    private final InitializerConfiguration properties;
 
     /**
      * Construct executor and initialize strategies via template hook.
      */
     public DeploymentStrategyExecutor(InitializerConfiguration properties, DeploymentMetrics deploymentMetrics) {
+        this.properties = Objects.requireNonNull(properties, "properties must not be null");
         this.deploymentMetrics = deploymentMetrics; // may be null
-        initializeStrategies(Objects.requireNonNull(properties, "properties must not be null"),
-                deploymentMetrics); // deploymentMetrics can be null if MeterRegistry is not available
+        initializeStrategies(this.properties, deploymentMetrics); // deploymentMetrics can be null if MeterRegistry is not available
     }
 
     /**
@@ -75,6 +76,59 @@ public class DeploymentStrategyExecutor {
                         wrap(primary, serviceKey, STABLE, StrategyType.BLUE_GREEN.getValue()),
                         wrap(secondary, serviceKey, EXPERIMENTAL, StrategyType.BLUE_GREEN.getValue()),
                         serviceKey);
+    }
+
+    /**
+     * Executes deployment strategy based on the activeStrategy configuration for the given service.
+     *
+     * @param primary the stable/primary function supplier
+     * @param secondary the experimental/secondary function supplier
+     * @param serviceKey the unique identifier for service configuration
+     * @return the result from the selected strategy execution
+     * @throws IllegalArgumentException if serviceKey is null, empty, or activeStrategy is not configured
+     * @throws IllegalStateException if activeStrategy value is invalid or strategy is not registered
+     */
+    public <R> R executeByActiveStrategy(Supplier<R> primary, Supplier<R> secondary, String serviceKey) {
+        if (serviceKey == null || serviceKey.trim().isEmpty()) {
+            throw new IllegalArgumentException("Service key must not be null or empty");
+        }
+
+        String activeStrategy = getActiveStrategy(serviceKey);
+        if (activeStrategy == null || activeStrategy.trim().isEmpty()) {
+            throw new IllegalArgumentException("Active strategy not configured for service: " + serviceKey);
+        }
+
+        switch (activeStrategy.toLowerCase().trim()) {
+            case "canary":
+                return executeCanary(primary, secondary, serviceKey);
+            case "shadow":
+                return executeShadow(primary, secondary, serviceKey);
+            case "bluegreen":
+            case "blue-green":
+                return executeBlueGreen(primary, secondary, serviceKey);
+            default:
+                throw new IllegalStateException("Invalid active strategy '" + activeStrategy + 
+                    "' for service '" + serviceKey + "'. Valid values are: canary, shadow, blueGreen");
+        }
+    }
+
+    /**
+     * Retrieves the active strategy configuration for the given service key.
+     *
+     * @param serviceKey the service key to look up
+     * @return the active strategy name, or null if not configured
+     */
+    private String getActiveStrategy(String serviceKey) {
+        if (properties == null || properties.getServices() == null) {
+            return null;
+        }
+        
+        InitializerConfiguration.DeployableServices serviceConfig = properties.getServices().get(serviceKey);
+        if (serviceConfig == null) {
+            return null;
+        }
+        
+        return serviceConfig.getActiveStrategy();
     }
 
     private DeploymentStrategy getRequiredStrategy(StrategyType type) {

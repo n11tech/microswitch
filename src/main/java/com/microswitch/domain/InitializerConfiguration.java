@@ -23,6 +23,7 @@ public class InitializerConfiguration {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class DeployableServices {
         private boolean enabled = true;
+        private String activeStrategy;
         private Canary canary;
         private BlueGreen blueGreen;
         private Shadow shadow;

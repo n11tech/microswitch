@@ -11,6 +11,8 @@ microswitch:
   services:
     order-service:
       enabled: true
+      # Active deployment strategy for this service (canary, shadow, blueGreen)
+      activeStrategy: canary
       canary:
         # Percentage of traffic going to the primary (stable) version in canary deployment.
         # Remaining percentage goes to the canary version.
