@@ -22,6 +22,7 @@
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <lombok.version>1.18.32</lombok.version>
 
         <!-- Plugin versions -->
         <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
