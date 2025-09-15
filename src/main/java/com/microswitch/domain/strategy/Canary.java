@@ -4,18 +4,17 @@ import com.microswitch.application.executor.DeploymentStrategy;
 import com.microswitch.application.random.UniqueRandomGenerator;
 import com.microswitch.domain.InitializerConfiguration;
 import com.microswitch.domain.value.AlgorithmType;
+import lombok.extern.slf4j.Slf4j;
+
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+@Slf4j
 public class Canary extends DeployTemplate implements DeploymentStrategy {
     
-    private static final Logger logger = LoggerFactory.getLogger(Canary.class);
-
     private final ConcurrentHashMap<String, AtomicInteger> serviceCounters = new ConcurrentHashMap<>();
     private final AtomicReference<ConcurrentHashMap<String, CanaryConfig>> serviceConfigs = new AtomicReference<>(new ConcurrentHashMap<>());
     private final ConcurrentHashMap<String, UniqueRandomGenerator> randomGenerators = new ConcurrentHashMap<>();
@@ -115,7 +114,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
             }
             return 100 / gcdValue;
         } catch (ArithmeticException e) {
-            logger.warn("GCD calculation failed, using default total calls of 100: {}", e.getMessage());
+            log.warn("GCD calculation failed, using default total calls of 100: {}", e.getMessage());
             return 100;
         }
     }
@@ -158,7 +157,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
         }
         
         if (sum != 100) {
-            return normalizeToPercentages(primary, secondary, sum);
+            return normalizeToPercentages(primary, sum);
         }
         
         CanaryConfig.validatePercentages(primary, secondary);
@@ -171,7 +170,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
         }
     }
     
-    private int[] normalizeToPercentages(int primary, int secondary, int sum) {
+    private int[] normalizeToPercentages(int primary, int sum) {
         int normalizedPrimary = (int) Math.round((primary * 100.0) / sum);
         int normalizedSecondary = 100 - normalizedPrimary;
         CanaryConfig.validatePercentages(normalizedPrimary, normalizedSecondary);
@@ -204,7 +203,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
                     return type;
                 }
             }
-            logger.warn("Unknown algorithm type: {}, defaulting to sequential", algorithmString);
+            log.warn("Unknown algorithm type: {}, defaulting to sequential", algorithmString);
             return AlgorithmType.SEQUENTIAL;
         }
     }
@@ -227,7 +226,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
             try {
                 return new UniqueRandomGenerator(config.totalCalls());
             } catch (Exception e) {
-                logger.warn("Failed to create UniqueRandomGenerator for service {}: {}", serviceKey, e.getMessage());
+                log.warn("Failed to create UniqueRandomGenerator for service {}: {}", serviceKey, e.getMessage());
                 return new UniqueRandomGenerator(100);
             }
         });
@@ -239,7 +238,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
                     generator = new UniqueRandomGenerator(config.totalCalls());
                     randomGenerators.put(serviceKey, generator);
                 } catch (Exception e) {
-                    logger.warn("Failed to reset UniqueRandomGenerator for service {}: {}", serviceKey, e.getMessage());
+                    log.warn("Failed to reset UniqueRandomGenerator for service {}: {}", serviceKey, e.getMessage());
                 }
             }
             randomValue = generator.getNextUniqueRandomValue();

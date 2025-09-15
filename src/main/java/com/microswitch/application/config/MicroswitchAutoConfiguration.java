@@ -1,6 +1,7 @@
 package com.microswitch.application.config;
 
 import com.microswitch.application.metric.DeploymentMetrics;
+import com.microswitch.application.metric.NoOpDeploymentMetrics;
 import com.microswitch.infrastructure.manager.DeploymentManager;
 import com.microswitch.domain.InitializerConfiguration;
 import com.microswitch.application.executor.DeploymentStrategyExecutor;
@@ -10,7 +11,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,29 +63,28 @@ public class MicroswitchAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(DeploymentManager.class)
     public DeploymentManager deploymentManager(DeploymentStrategyExecutor strategyFactory) {
-        // Use reflection to call the package-private factory method
-        try {
-            var factoryMethod = DeploymentManager.class.getDeclaredMethod(
-                "createWithExecutor", Object.class);
-            factoryMethod.setAccessible(true);
-            return (DeploymentManager) factoryMethod.invoke(null, strategyFactory);
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to create DeploymentManager", e);
-        }
+        // Call the public factory method directly (no reflection)
+        return DeploymentManager.createWithExecutor(strategyFactory);
     }
 
     /**
      * Creates the DeploymentMetrics bean if none exists.
+     * If a MeterRegistry is available, creates a real DeploymentMetrics.
+     * Otherwise, creates a NoOpDeploymentMetrics to prevent null injection.
      *
-     * @param meterRegistry the micrometer meter registry
-     * @return configured deployment metrics
+     * @param meterRegistry the micrometer meter registry (optional)
+     * @return configured deployment metrics (never null)
      */
     @Bean
     @ConditionalOnMissingBean(DeploymentMetrics.class)
-    @ConditionalOnBean(MeterRegistry.class)
-    public DeploymentMetrics deploymentMetrics(MeterRegistry meterRegistry) {
-        return new DeploymentMetrics(meterRegistry);
+    public DeploymentMetrics deploymentMetrics(@Autowired(required = false) MeterRegistry meterRegistry) {
+        if (meterRegistry != null) {
+            return new DeploymentMetrics(meterRegistry);
+        } else {
+            return new NoOpDeploymentMetrics();
+        }
     }
+
 
     /**
      * Configuration for Spring Boot Actuator integration.
@@ -94,7 +93,7 @@ public class MicroswitchAutoConfiguration {
      * when Spring Boot Actuator is present on the classpath.
      */
     @Configuration(proxyBeanMethods = false)
-    @ConditionalOnClass(org.springframework.boot.actuate.endpoint.annotation.Endpoint.class)
+    @ConditionalOnClass(name = "org.springframework.boot.actuate.endpoint.annotation.Endpoint")
     protected static class MicroswitchActuatorConfiguration {
 
         /**

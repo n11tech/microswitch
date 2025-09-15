@@ -3,8 +3,6 @@ package com.microswitch.domain.strategy;
 import com.microswitch.application.executor.DeploymentStrategy;
 import com.microswitch.domain.InitializerConfiguration;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;

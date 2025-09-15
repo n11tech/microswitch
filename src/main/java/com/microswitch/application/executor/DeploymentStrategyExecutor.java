@@ -22,6 +22,9 @@ import java.util.function.Supplier;
  */
 public class DeploymentStrategyExecutor {
 
+    private static final String STABLE = "stable";
+    private static final String EXPERIMENTAL = "experimental";
+
     private final Map<StrategyType, DeploymentStrategy> strategies = new EnumMap<>(StrategyType.class);
     private final DeploymentMetrics deploymentMetrics; // may be null if no MeterRegistry
 
@@ -53,24 +56,24 @@ public class DeploymentStrategyExecutor {
     public <R> R executeCanary(Supplier<R> primary, Supplier<R> secondary, String serviceKey) {
         return getRequiredStrategy(StrategyType.CANARY)
                 .execute(
-                        wrap(primary, serviceKey, "stable", "canary"),
-                        wrap(secondary, serviceKey, "experimental", "canary"),
+                        wrap(primary, serviceKey, STABLE, StrategyType.CANARY.getValue()),
+                        wrap(secondary, serviceKey, EXPERIMENTAL, StrategyType.CANARY.getValue()),
                         serviceKey);
     }
 
     public <R> R executeShadow(Supplier<R> primary, Supplier<R> secondary, String serviceKey) {
         return getRequiredStrategy(StrategyType.SHADOW)
                 .execute(
-                        wrap(primary, serviceKey, "stable", "shadow"),
-                        wrap(secondary, serviceKey, "experimental", "shadow"),
+                        wrap(primary, serviceKey, STABLE, StrategyType.SHADOW.getValue()),
+                        wrap(secondary, serviceKey, EXPERIMENTAL, StrategyType.SHADOW.getValue()),
                         serviceKey);
     }
 
     public <R> R executeBlueGreen(Supplier<R> primary, Supplier<R> secondary, String serviceKey) {
         return getRequiredStrategy(StrategyType.BLUE_GREEN)
                 .execute(
-                        wrap(primary, serviceKey, "stable", "blue_green"),
-                        wrap(secondary, serviceKey, "experimental", "blue_green"),
+                        wrap(primary, serviceKey, STABLE, StrategyType.BLUE_GREEN.getValue()),
+                        wrap(secondary, serviceKey, EXPERIMENTAL, StrategyType.BLUE_GREEN.getValue()),
                         serviceKey);
     }
 

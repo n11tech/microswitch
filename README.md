@@ -185,15 +185,18 @@ microswitch:
 
 ### Prometheus/Micrometer
 
-If Micrometer is present and a `MeterRegistry` bean exists, Microswitch publishes deployment metrics automatically (e.g., counters per strategy/service/version).
+If Micrometer is present and a `MeterRegistry` bean exists, Microswitch publishes counters per strategy/service/version automatically.
 
 ```
-# Başarılı deployment sayıları
+# HELP microswitch_success_total
+# TYPE microswitch_success_total counter
 microswitch_success_total{service="user-service",version="stable",strategy="canary"} 85
 microswitch_success_total{service="user-service",version="experimental",strategy="canary"} 15
 
-# Shadow executions
-microswitch_success_total{service="payment-service",version="shadow_execution",strategy="shadow"} 12
+# HELP microswitch_error_total
+# TYPE microswitch_error_total counter
+microswitch_error_total{service="user-service",version="stable",strategy="canary"} 3
+microswitch_error_total{service="user-service",version="experimental",strategy="canary"} 2
 ```
 
 ### Prometheus setup (recommended)
@@ -232,8 +235,17 @@ scrape_configs:
   - job_name: "microswitch"
     metrics_path: "/actuator/prometheus"
     static_configs:
-      - targets: ["HOST:PORT"]
+      - targets: ["localhost:8080"]
 ```
+
+### Automatic metrics handling
+
+Microswitch automatically provides a `DeploymentMetrics` bean in all scenarios:
+
+- **With `MeterRegistry`** (when Actuator + Prometheus registry are present): Real metrics are recorded and exposed at `/actuator/prometheus`
+- **Without `MeterRegistry`**: A no-operation implementation is used that safely ignores metric calls without errors
+
+This ensures `DeploymentStrategyExecutor` never encounters null metrics, maintaining reliability across all deployment configurations.
 
 4) Example PromQL queries using Microswitch counters
 

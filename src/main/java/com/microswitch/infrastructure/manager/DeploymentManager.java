@@ -55,7 +55,7 @@ public final class DeploymentManager {
      * @param strategyExecutor the internal strategy executor
      * @return a new DeploymentManager instance
      */
-    static DeploymentManager createWithExecutor(Object strategyExecutor) {
+    public static DeploymentManager createWithExecutor(Object strategyExecutor) {
         return new DeploymentManager(strategyExecutor);
     }
 
