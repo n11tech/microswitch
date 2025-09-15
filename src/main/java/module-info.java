@@ -37,6 +37,8 @@ module com.n11.development.microswitch {
     requires com.fasterxml.jackson.dataformat.yaml;
     // Jackson annotations used in InitializerConfiguration
     requires com.fasterxml.jackson.annotation;
+    // Jackson databind (used in DeepObjectComparator)
+    requires com.fasterxml.jackson.databind;
 
     // Lombok is used at compile-time only; mark as static
     requires static lombok;

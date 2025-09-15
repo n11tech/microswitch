@@ -2,6 +2,7 @@ package com.microswitch.domain.strategy;
 
 import com.microswitch.application.executor.DeploymentStrategy;
 import com.microswitch.domain.InitializerConfiguration;
+import com.microswitch.domain.util.DeepObjectComparator;
 import com.microswitch.domain.value.MethodType;
 import lombok.extern.slf4j.Slf4j;
 
@@ -17,12 +18,23 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
     private final AtomicInteger requestCounter = new AtomicInteger(0);
     private final ExecutorService shadowExecutor;
     private volatile boolean isShutdown = false;
+    private final DeepObjectComparator comparator;
 
     public Shadow(InitializerConfiguration properties) {
         super(properties);
         this.shadowExecutor = Executors.newThreadPerTaskExecutor(
                 Thread.ofVirtual().name("shadow-virtual-", 0).factory()
         );
+        
+        // Initialize comparator with optimal strategy for shadow traffic
+        // Using HYBRID strategy for best balance of performance and accuracy
+        this.comparator = DeepObjectComparator.builder()
+                .withStrategy(DeepObjectComparator.ComparisonStrategy.HYBRID)
+                .withMaxDepth(10) // Reasonable depth to prevent stack overflow
+                .compareNullsAsEqual(false) // Treat nulls as different for accurate comparison
+                .ignoreFields("timestamp", "requestId", "traceId") // Ignore common tracking fields
+                .build();
+        
         Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
     }
 
@@ -93,10 +105,18 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
 
             if (Objects.isNull(mirrorResult)) {
                 log.warn("Shadow result is null. The shadow function may have thrown an exception or returned null.");
-            } else if (!stableResult.equals(mirrorResult)) {
-                log.warn("Shadow result does not match stable result for service: {}", serviceKey);
+            } else if (!comparator.areEqual(stableResult, mirrorResult)) {
+                // Deep comparison of objects to validate field-level equality
+                log.warn("Shadow result does not match stable result for service: {}. " +
+                        "Deep comparison detected differences in object fields.", serviceKey);
+                
+                // Optional: Log sample differences for debugging (in debug mode)
+                if (log.isDebugEnabled()) {
+                    log.debug("Stable result: {}, Mirror result: {}", stableResult, mirrorResult);
+                }
             } else {
-                log.info("Shadow execution successful - results match for service: {}", serviceKey);
+                log.info("Shadow execution successful - results match for service: {} " +
+                        "(deep comparison validated)", serviceKey);
             }
 
             return stableResult;
