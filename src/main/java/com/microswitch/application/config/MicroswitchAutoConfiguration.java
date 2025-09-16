@@ -8,10 +8,10 @@ import com.microswitch.application.executor.DeploymentStrategyExecutor;
 import com.microswitch.application.executor.MicroswitchDeploymentStrategyExecutor;
 import com.microswitch.infrastructure.external.Endpoint;
 import io.micrometer.core.instrument.MeterRegistry;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -31,14 +31,31 @@ import org.springframework.context.annotation.Configuration;
  * @author N11 Development Team
  * @since 1.0
  */
+@Slf4j
 @AutoConfiguration
-@ConditionalOnProperty(prefix = "microswitch", name = "enabled", havingValue = "true", matchIfMissing = true)
 @ConditionalOnClass({DeploymentManager.class})
 @EnableConfigurationProperties(InitializerConfiguration.class)
 @ComponentScan(basePackages = {
         "com.microswitch.application.metric"
 })
 public class MicroswitchAutoConfiguration {
+
+    private final InitializerConfiguration properties;
+
+    public MicroswitchAutoConfiguration(InitializerConfiguration properties) {
+        this.properties = properties;
+    }
+
+    @Bean
+    public String logInitialization() {
+        if (properties != null && properties.isEnabled()) {
+            log.info("Microswitch library initialized and ENABLED - deployment strategies are now available");
+            return "microswitch-enabled";
+        } else {
+            log.info("Microswitch library initialized but DISABLED - DeploymentManager bean is available but strategies are disabled");
+            return "microswitch-disabled";
+        }
+    }
 
     /**
      * Creates the DeploymentStrategyExecutor bean if none exists.

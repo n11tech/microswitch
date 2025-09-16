@@ -42,7 +42,7 @@ Maven
 <dependency>
   <groupId>com.n11.development</groupId>
   <artifactId>microswitch</artifactId>
-  <version>1.1.1</version>
+  <version>1.1.2</version>
   <scope>compile</scope>
 </dependency>
 ```
@@ -50,7 +50,7 @@ Maven
 Gradle
 
 ```gradle
-implementation 'com.n11.development:microswitch:1.1.1'
+implementation 'com.n11.development:microswitch:1.1.2'
 ```
 
 ## Quick Start
@@ -150,7 +150,52 @@ String result = deploymentManager.blueGreen(
 
 ## Release Notes
 
-### Version 1.1.1 (Latest)
+### Version 1.1.2 (Latest)
+
+#### Bug Fixes & Improvements
+
+##### 1. Enhanced Constructor Injection
+Improved dependency injection reliability by replacing field injection with constructor injection in `MicroswitchAutoConfiguration`:
+
+```java
+// Before: Field injection with @Autowired
+@Autowired
+private InitializerConfiguration properties;
+
+// After: Constructor injection (more reliable)
+public MicroswitchAutoConfiguration(InitializerConfiguration properties) {
+    this.properties = properties;
+}
+```
+
+**Benefits:**
+- More reliable dependency injection
+- Better testability and immutability
+- Follows Spring Boot best practices
+- Eliminates potential null pointer exceptions
+
+##### 2. Improved Logging and Error Handling
+Enhanced logging throughout the library for better debugging and monitoring:
+
+- Added detailed initialization logging based on enabled/disabled state
+- Improved error messages for configuration validation
+- Enhanced debug logging for strategy execution paths
+- Better exception handling with more descriptive error messages
+
+##### 3. Configuration Validation Improvements
+Strengthened configuration validation and error reporting:
+
+- Better validation messages for invalid strategy configurations
+- Improved handling of missing or malformed configuration sections
+- Enhanced fallback mechanisms for edge cases
+
+#### Benefits
+- **Better Reliability**: Constructor injection eliminates potential initialization issues
+- **Enhanced Debugging**: Improved logging helps identify configuration and execution issues
+- **Stronger Validation**: Better error messages and validation for configuration problems
+- **Maintainability**: Code follows Spring Boot best practices
+
+### Version 1.1.1
 
 #### New Features
 
@@ -185,10 +230,30 @@ When enabled:
 - Uses HYBRID strategy: checks for overridden equals() first, falls back to field comparison
 - Automatically ignores common tracking fields (timestamp, requestId, traceId)
 
+##### 3. Bean Availability When Disabled
+Fixed dependency injection issues when microswitch is disabled:
+
+```yaml
+microswitch:
+  enabled: false  # DeploymentManager bean is still available for injection
+```
+
+**Problem Solved**: Previously, when `microswitch.enabled=false`, the `DeploymentManager` bean was not created, causing Spring Boot applications to fail with:
+```
+Parameter 2 of constructor required a bean of type 'DeploymentManager' that could not be found
+```
+
+**Solution**: The `DeploymentManager` bean is now always created regardless of the `enabled` setting:
+- When `enabled: true`: Full functionality with all strategies available
+- When `enabled: false`: Bean is available but strategies are disabled internally
+- Applications can safely inject `DeploymentManager` without startup failures
+- Runtime logging clearly indicates the enabled/disabled state
+
 #### Benefits
 - **Better Observability**: Track exactly which service, strategy, and method are executing
 - **Accurate Shadow Validation**: Compare actual object content, not just references
-- **Zero Code Changes**: Both features are configuration-driven
+- **Reliable Dependency Injection**: No startup failures when microswitch is disabled
+- **Zero Code Changes**: All features are configuration-driven
 - **Performance Optimized**: No impact when disabled (default)
 
 ### Version 1.1.0
@@ -619,7 +684,8 @@ public void onApplicationReady(ApplicationReadyEvent event) {
 ```
 Error: No qualifying bean of type 'DeploymentManager'
 ```
-Add `com.n11.development` into your `@ComponentScan`.
+
+**Solution 1**: If you're using an older version (< v1.1.1), add `com.n11.development` into your `@ComponentScan`:
 
 ```java
 @SpringBootApplication
@@ -627,6 +693,16 @@ Add `com.n11.development` into your `@ComponentScan`.
 public class Application {
     // ...
 }
+```
+
+**Solution 2**: If you're using v1.1.1+ and have `microswitch.enabled=false`, this issue is automatically resolved. The `DeploymentManager` bean is now always created regardless of the enabled setting. Simply ensure you have the correct version:
+
+```xml
+<dependency>
+  <groupId>com.n11.development</groupId>
+  <artifactId>microswitch</artifactId>
+  <version>1.1.2</version>
+</dependency>
 ```
 
 #### 2. Konfigürasyon Yüklenmiyor

@@ -4,7 +4,7 @@
 
 microswitch:
   # Master switch for the library. If false, all strategies are disabled by default.
-  enabled: true
+  enabled: false
   # Enable/disable detailed logging of service key, strategy, and method execution.
   # When enabled, logs which service, strategy, and method (primary/secondary) are being executed.
   # Default: disable (no detailed execution logging)
