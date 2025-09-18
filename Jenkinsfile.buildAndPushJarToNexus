@@ -1,9 +1,0 @@
-library 'n11'
-
-buildAndPushJarToNexus {
-   project = 'development'
-   service = 'microswitch'
-   nexusRepository='releases'
-   nexusGroup ='com/n11/'
-   isJava21='true'
-}
