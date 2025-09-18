@@ -100,9 +100,3 @@ jobs:
         scan-ref: '.'
         format: 'sarif'
         output: 'trivy-results.sarif'
-        
-    - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v3
-      if: github.event_name == 'push'
-      with:
-        sarif_file: 'trivy-results.sarif'
