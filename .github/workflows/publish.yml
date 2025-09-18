@@ -3,6 +3,12 @@ name: Publish to GitHub Packages
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      skipTests:
+        description: 'Skip tests during publish'
+        required: false
+        default: 'true'
 
 permissions:
   contents: read
@@ -31,7 +37,7 @@ jobs:
 
       - name: Build and publish
         run: |
-          mvn -B -DskipTests \
+          mvn -B $([[ "${{ github.event.inputs.skipTests }}" != 'false' ]] && echo '-DskipTests') \
             -Dgpr.owner=${GPR_OWNER} \
             -Dgpr.repo=${GPR_REPO} \
             clean deploy
