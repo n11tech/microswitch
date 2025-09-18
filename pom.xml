@@ -18,6 +18,28 @@
 
     <name>microswitch</name>
     <description>Microswitch</description>
+    <url>https://github.com/${gpr.owner}/${gpr.repo}</url>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <scm>
+        <url>https://github.com/${gpr.owner}/${gpr.repo}</url>
+        <connection>scm:git:https://github.com/${gpr.owner}/${gpr.repo}.git</connection>
+        <developerConnection>scm:git:git@github.com:${gpr.owner}/${gpr.repo}.git</developerConnection>
+        <tag>HEAD</tag>
+    </scm>
+
+    <developers>
+        <developer>
+            <name>Fatih Karaman</name>
+        </developer>
+    </developers>
 
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
@@ -31,6 +53,10 @@
         <maven-checkstyle-plugin.version>3.3.1</maven-checkstyle-plugin.version>
         <maven-source-plugin.version>3.3.0</maven-source-plugin.version>
         <maven-javadoc-plugin.version>3.6.3</maven-javadoc-plugin.version>
+
+        <!-- GitHub Packages coordinates (override via -Dgpr.owner=ORG -Dgpr.repo=REPO) -->
+        <gpr.owner>n11tech</gpr.owner>
+        <gpr.repo>microswitch</gpr.repo>
     </properties>
 
     <dependencies>
@@ -79,6 +105,15 @@
             <artifactId>slf4j-api</artifactId>
         </dependency>
     </dependencies>
+
+    <!-- Publish to GitHub Packages -->
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/${gpr.owner}/${gpr.repo}</url>
+        </repository>
+    </distributionManagement>
 
     <build>
         <plugins>
