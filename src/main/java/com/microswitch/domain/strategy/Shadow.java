@@ -42,7 +42,8 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
                         .withMaxCollectionElements(cmpCfg.getMaxCollectionElements())
                         .withMaxCompareTimeMillis(cmpCfg.getMaxCompareTimeMillis())
                         .enableSamplingOnHuge(cmpCfg.isEnableSamplingOnHuge())
-                        .withStride(cmpCfg.getStride());
+                        .withStride(cmpCfg.getStride())
+                        .withMaxFieldsPerClass(cmpCfg.getMaxFieldsPerClass());
             }
 
             this.comparator = builder.build();

@@ -33,6 +33,7 @@ public class DeepObjectComparator {
     private final long maxCompareTimeMillis;
     private final boolean enableSamplingOnHuge;
     private final int stride;
+    private final int maxFieldsPerClass;
     
     public enum ComparisonStrategy {
         /**
@@ -70,6 +71,7 @@ public class DeepObjectComparator {
         private long maxCompareTimeMillis = 200L;
         private boolean enableSamplingOnHuge = true;
         private int stride = 100;
+        private int maxFieldsPerClass = 1_000;
         
         public Builder withStrategy(ComparisonStrategy strategy) {
             this.strategy = strategy;
@@ -111,16 +113,23 @@ public class DeepObjectComparator {
             return this;
         }
         
+        public Builder withMaxFieldsPerClass(int maxFieldsPerClass) {
+            // Enforce an absolute upper bound of 100 fields per class
+            int sanitized = Math.max(1, maxFieldsPerClass);
+            this.maxFieldsPerClass = Math.min(100, sanitized);
+            return this;
+        }
+        
         public DeepObjectComparator build() {
             return new DeepObjectComparator(strategy, fieldsToIgnore, maxDepth, compareNullsAsEqual,
-                    maxCollectionElements, maxCompareTimeMillis, enableSamplingOnHuge, stride);
+                    maxCollectionElements, maxCompareTimeMillis, enableSamplingOnHuge, stride, maxFieldsPerClass);
         }
     }
     
     private DeepObjectComparator(ComparisonStrategy strategy, Set<String> fieldsToIgnore, 
                                  int maxDepth, boolean compareNullsAsEqual,
                                  int maxCollectionElements, long maxCompareTimeMillis,
-                                 boolean enableSamplingOnHuge, int stride) {
+                                 boolean enableSamplingOnHuge, int stride, int maxFieldsPerClass) {
         this.strategy = strategy;
         this.fieldsToIgnore = new HashSet<>(fieldsToIgnore);
         this.maxDepth = maxDepth;
@@ -129,6 +138,7 @@ public class DeepObjectComparator {
         this.maxCompareTimeMillis = maxCompareTimeMillis;
         this.enableSamplingOnHuge = enableSamplingOnHuge;
         this.stride = stride;
+        this.maxFieldsPerClass = maxFieldsPerClass;
     }
     
     public static Builder builder() {
@@ -532,6 +542,13 @@ public class DeepObjectComparator {
             while (c != null && c != Object.class) {
                 fields.addAll(Arrays.asList(c.getDeclaredFields()));
                 c = c.getSuperclass();
+            }
+            if (fields.size() > maxFieldsPerClass) {
+                if (log.isWarnEnabled()) {
+                    log.warn("Deep comparison field cap reached for class {}: {} fields > maxFieldsPerClass={}, truncating",
+                            clazz.getName(), fields.size(), maxFieldsPerClass);
+                }
+                return fields.subList(0, maxFieldsPerClass).toArray(new Field[0]);
             }
             return fields.toArray(new Field[0]);
         });

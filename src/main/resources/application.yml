@@ -46,6 +46,9 @@ microswitch:
           enableSamplingOnHuge: true
           # Sampling step used in stride sampling (every Nth element is compared).
           stride: 100
+          # Cap the number of reflected fields per class considered during deep comparison.
+          # Hard cap: 100 (values above 100 are clamped at runtime)
+          maxFieldsPerClass: 100
 
 # You can override any of these values per environment using Spring profiles,
 # e.g., create application-dev.yml and application-prod.yml and place overrides there.

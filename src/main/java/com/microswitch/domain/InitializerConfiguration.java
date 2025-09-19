@@ -140,6 +140,17 @@ public class InitializerConfiguration {
              * Sampling stride/step for large lists when sampling is enabled.
              */
             private int stride = 100;
+            /**
+             * Maximum number of reflected fields per class to consider during deep comparison.
+             * Prevents excessive work on pathological or generated classes.
+             */
+            private int maxFieldsPerClass = 100; // Hard max enforced
+
+            // Enforce absolute upper bound of 100 regardless of provided value
+            public void setMaxFieldsPerClass(int maxFieldsPerClass) {
+                int sanitized = Math.max(1, maxFieldsPerClass);
+                this.maxFieldsPerClass = Math.min(100, sanitized);
+            }
         }
     }
 }
