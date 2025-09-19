@@ -42,7 +42,7 @@ Maven
 <dependency>
   <groupId>com.n11.development</groupId>
   <artifactId>microswitch</artifactId>
-  <version>1.1.2</version>
+  <version>1.2.2</version>
   <scope>compile</scope>
 </dependency>
 ```
@@ -50,7 +50,7 @@ Maven
 Gradle
 
 ```gradle
-implementation 'com.n11.development:microswitch:1.1.2'
+implementation 'com.n11.development:microswitch:1.2.2'
 ```
 
 ## Quick Start
@@ -74,7 +74,12 @@ microswitch:
         stable: primary               # returns result from this path
         mirror: secondary             # mirrors this path when triggered
         mirrorPercentage: 10          # mirror every 10% of calls
-        comparator: disable           # NEW in v1.1.1: deep object comparison (enable/disable)
+        comparator:                   # NEW in v1.2.2: nested comparator tuning
+          mode: disable               # enable/disable deep comparison
+          maxCollectionElements: 10000
+          maxCompareTimeMillis: 200
+          enableSamplingOnHuge: true
+          stride: 100
 ```
 
 2) Inject and use `DeploymentManager`
@@ -150,7 +155,44 @@ String result = deploymentManager.blueGreen(
 
 ## Release Notes
 
-### Version 1.1.2 (Latest)
+### Version 1.2.2 (Latest)
+
+#### New in 1.2.2 — Shadow Deep Comparator Tuning & WARN Visibility
+
+1) Comparator tuning for large data structures (Shadow strategy)
+
+```yaml
+microswitch:
+  services:
+    order-service:
+      shadow:
+        comparator:
+          mode: enable               # enable/disable deep comparison
+          maxCollectionElements: 10000   # switch to sampling for very large lists
+          maxCompareTimeMillis: 200      # time budget in ms; returns early when exceeded
+          enableSamplingOnHuge: true     # enable sampling mode for huge lists
+          stride: 100                    # sampling step for lists
+```
+
+- Large lists: head/tail + stride sampling prevents O(n) deep scans
+- Time budget: early return if the total comparison time exceeds the configured budget
+
+2) Operational visibility with WARN logs
+
+- Sampling activated: `Deep comparison sampling activated for large list (size=...)`
+- Time budget exceeded: `Deep comparison time budget exceeded (>X ms) at ... after Y ms; returning early`
+
+These logs make performance-protection behavior observable in production without extra instrumentation.
+
+3) Backward compatibility
+
+- Legacy `shadow.comparator: enable|disable` still works and maps to `shadow.comparator.mode`
+- New nested fields are optional and come with safe defaults
+
+#### Improvements carried over from 1.1.2
+
+- Enhanced constructor injection in auto-configuration
+- Improved logging and configuration validation
 
 #### Bug Fixes & Improvements
 
@@ -195,7 +237,7 @@ Strengthened configuration validation and error reporting:
 - **Stronger Validation**: Better error messages and validation for configuration problems
 - **Maintainability**: Code follows Spring Boot best practices
 
-### Version 1.1.1
+### Version 1.1.2
 
 #### New Features
 
@@ -332,7 +374,12 @@ microswitch:
         stable: primary
         mirror: secondary
         mirrorPercentage: 20       # mirror 20% of the time
-        comparator: disable        # NEW v1.1.1: deep object comparison (enable/disable)
+        comparator:
+          mode: disable            # deep object comparison (enable/disable)
+          maxCollectionElements: 10000
+          maxCompareTimeMillis: 200
+          enableSamplingOnHuge: true
+          stride: 100
 
     user-service:
       enabled: false               # disabled — only stable executes
@@ -353,7 +400,11 @@ microswitch:
 | `services.<key>.shadow.stable` | Which method is considered stable (`primary` or `secondary`) | `primary` |
 | `services.<key>.shadow.mirror` | Which method is mirrored (`primary` or `secondary`) | `secondary` |
 | `services.<key>.shadow.mirrorPercentage` | Percentage of calls that will trigger a mirror execution (0–100) | `0` |
-| `services.<key>.shadow.comparator` | **NEW v1.1.1**: Enable/disable deep object comparison for shadow validation | `disable` |
+| `services.<key>.shadow.comparator.mode` | **v1.2.2**: Enable/disable deep object comparison for shadow validation | `disable` |
+| `services.<key>.shadow.comparator.maxCollectionElements` | **v1.2.2**: Threshold to activate sampling for large lists | `10000` |
+| `services.<key>.shadow.comparator.maxCompareTimeMillis` | **v1.2.2**: Time budget for deep comparison (ms) | `200` |
+| `services.<key>.shadow.comparator.enableSamplingOnHuge` | **v1.2.2**: Enable sampling mode for huge lists | `true` |
+| `services.<key>.shadow.comparator.stride` | **v1.2.2**: Sampling step for list comparison | `100` |
 
 ## Metrics & Actuator
 

@@ -32,11 +32,20 @@ microswitch:
       shadow:
         stable: primary
         mirror: secondary
+        # Legacy name retained for backward compatibility with InitializerConfiguration setters
         mirrorPercentage: 10
-        # Enable/disable deep object comparison for shadow traffic validation.
-        # When enabled, compares objects by field values rather than reference equality.
-        # Default: disable (uses standard equals() method)
-        comparator: disable
+        # Deep comparison configuration. When enabled, objects are compared by field values.
+        comparator:
+          # enable | disable (case-insensitive). Legacy single-line `comparator: enable` also supported.
+          mode: disable
+          # If a list size exceeds this threshold, sampler mode is activated instead of full scan.
+          maxCollectionElements: 10000
+          # Hard time budget for comparison in milliseconds. Exceeding returns early with WARN log.
+          maxCompareTimeMillis: 200
+          # When true, activates sampling for very large lists to avoid O(n) full scan cost.
+          enableSamplingOnHuge: true
+          # Sampling step used in stride sampling (every Nth element is compared).
+          stride: 100
 
 # You can override any of these values per environment using Spring profiles,
 # e.g., create application-dev.yml and application-prod.yml and place overrides there.

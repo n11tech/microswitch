@@ -30,12 +30,22 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
         this.deepComparisonEnabled = checkIfDeepComparisonEnabled(properties);
         
         if (this.deepComparisonEnabled) {
-            this.comparator = DeepObjectComparator.builder()
+            var cmpCfg = resolveComparatorConfig(properties);
+            DeepObjectComparator.Builder builder = DeepObjectComparator.builder()
                     .withStrategy(DeepObjectComparator.ComparisonStrategy.HYBRID)
-                    .withMaxDepth(10) 
-                    .compareNullsAsEqual(false) 
-                    .ignoreFields("timestamp", "requestId", "traceId") 
-                    .build();
+                    .withMaxDepth(10)
+                    .compareNullsAsEqual(false)
+                    .ignoreFields("timestamp", "requestId", "traceId");
+
+            if (cmpCfg != null) {
+                builder = builder
+                        .withMaxCollectionElements(cmpCfg.getMaxCollectionElements())
+                        .withMaxCompareTimeMillis(cmpCfg.getMaxCompareTimeMillis())
+                        .enableSamplingOnHuge(cmpCfg.isEnableSamplingOnHuge())
+                        .withStride(cmpCfg.getStride());
+            }
+
+            this.comparator = builder.build();
         } else {
             this.comparator = null; 
         }
@@ -47,19 +57,39 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
         if (properties.getServices() != null) {
             for (var service : properties.getServices().values()) {
                 if (service.getShadow() != null && 
-                    "enable".equalsIgnoreCase(service.getShadow().getComparator())) {
+                    "enable".equalsIgnoreCase(service.getShadow().getComparatorMode())) {
                     return true;
                 }
             }
         }
         return false;
     }
+
+    /**
+     * Resolve comparator configuration from the first service that has deep comparison enabled.
+     * If multiple services enable it, the first encountered configuration will be used as global defaults
+     * for the comparator instance. This keeps initialization simple while allowing tuning via config.
+     */
+    private InitializerConfiguration.Shadow.Comparator resolveComparatorConfig(InitializerConfiguration properties) {
+        if (properties.getServices() == null) {
+            return null;
+        }
+        for (var entry : properties.getServices().entrySet()) {
+            var service = entry.getValue();
+            if (service == null || service.getShadow() == null) continue;
+            var shadow = service.getShadow();
+            if ("enable".equalsIgnoreCase(shadow.getComparatorMode())) {
+                return shadow.getComparator();
+            }
+        }
+        return null;
+    }
     
     private boolean isDeepComparisonEnabledForService(String serviceKey) {
         if (configuration.getServices() != null) {
             var service = configuration.getServices().get(serviceKey);
             if (service != null && service.getShadow() != null) {
-                return "enable".equalsIgnoreCase(service.getShadow().getComparator());
+                return "enable".equalsIgnoreCase(service.getShadow().getComparatorMode());
             }
         }
         return false;
