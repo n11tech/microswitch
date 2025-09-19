@@ -39,7 +39,7 @@ public class InitializerConfiguration {
     @Getter
     @Setter
     public static class Canary {
-        private String percentage = "50/50";
+        private String percentage = "1/99";
         private String algorithm = "sequential";
     }
 
@@ -48,11 +48,14 @@ public class InitializerConfiguration {
     public static class BlueGreen {
         private String weight = "1/0";
         // Use wrapper to allow null during binding when value is empty string
-        private Integer ttl = 300;
+        private Integer ttl = 0;
 
-        // Support numeric binding
-        public void setTtl(long ttl) {
-            this.ttl = (int) ttl;
+        // Support numeric binding via wrapper to allow null (empty string maps to null safely)
+        public void setTtl(Long ttl) {
+            if (ttl == null) {
+                return; // keep current/default value when source is empty string
+            }
+            this.ttl = ttl.intValue();
         }
 
         // Gracefully handle empty string values from configuration sources
