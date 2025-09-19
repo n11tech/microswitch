@@ -13,11 +13,33 @@
 
     <groupId>com.n11.development</groupId>
     <artifactId>microswitch</artifactId>
-    <version>1.1.2</version>
+    <version>1.2.2</version>
     <packaging>jar</packaging>
 
     <name>microswitch</name>
     <description>Microswitch</description>
+    <url>https://github.com/${gpr.owner}/${gpr.repo}</url>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <scm>
+        <url>https://github.com/${gpr.owner}/${gpr.repo}</url>
+        <connection>scm:git:https://github.com/${gpr.owner}/${gpr.repo}.git</connection>
+        <developerConnection>scm:git:git@github.com:${gpr.owner}/${gpr.repo}.git</developerConnection>
+        <tag>HEAD</tag>
+    </scm>
+
+    <developers>
+        <developer>
+            <name>Fatih Karaman</name>
+        </developer>
+    </developers>
 
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
@@ -31,6 +53,10 @@
         <maven-checkstyle-plugin.version>3.3.1</maven-checkstyle-plugin.version>
         <maven-source-plugin.version>3.3.0</maven-source-plugin.version>
         <maven-javadoc-plugin.version>3.6.3</maven-javadoc-plugin.version>
+
+        <!-- GitHub Packages coordinates (override via -Dgpr.owner=ORG -Dgpr.repo=REPO) -->
+        <gpr.owner>n11tech</gpr.owner>
+        <gpr.repo>microswitch</gpr.repo>
     </properties>
 
     <dependencies>
@@ -70,6 +96,7 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
             <optional>true</optional>
         </dependency>
 
@@ -96,6 +123,26 @@
                             <version>${lombok.version}</version>
                         </path>
                     </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+
+            <!-- Add manifest entries for artifact name and version -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                            <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+                        </manifest>
+                        <manifestEntries>
+                            <Implementation-Title>${project.artifactId}</Implementation-Title>
+                            <Implementation-Version>${project.version}</Implementation-Version>
+                            <Implementation-Vendor>${project.groupId}</Implementation-Vendor>
+                        </manifestEntries>
+                    </archive>
                 </configuration>
             </plugin>
 
@@ -152,6 +199,28 @@
                         <goals>
                             <goal>check</goal>
                         </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- CycloneDX SBOM generation for security tooling -->
+            <plugin>
+                <groupId>org.cyclonedx</groupId>
+                <artifactId>cyclonedx-maven-plugin</artifactId>
+                <version>2.9.0</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>makeAggregateBom</goal>
+                        </goals>
+                        <configuration>
+                            <schemaVersion>1.5</schemaVersion>
+                            <includeBomSerialNumber>true</includeBomSerialNumber>
+                            <outputFormat>json</outputFormat>
+                            <outputName>bom</outputName>
+                            <includeLicenseText>false</includeLicenseText>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

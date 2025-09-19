@@ -23,14 +23,17 @@ public class DeepObjectComparator {
             .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
             .configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
     
-    // Cache for reflection metadata to improve performance
     private static final Map<Class<?>, Field[]> FIELD_CACHE = new ConcurrentHashMap<>();
     
-    // Configuration
     private final ComparisonStrategy strategy;
     private final Set<String> fieldsToIgnore;
     private final int maxDepth;
     private final boolean compareNullsAsEqual;
+    private final int maxCollectionElements;
+    private final long maxCompareTimeMillis;
+    private final boolean enableSamplingOnHuge;
+    private final int stride;
+    private final int maxFieldsPerClass;
     
     public enum ComparisonStrategy {
         /**
@@ -59,12 +62,16 @@ public class DeepObjectComparator {
         COLLECTION_OPTIMIZED
     }
     
-    // Builder pattern for configuration
     public static class Builder {
         private ComparisonStrategy strategy = ComparisonStrategy.HYBRID;
         private Set<String> fieldsToIgnore = new HashSet<>();
         private int maxDepth = 10;
         private boolean compareNullsAsEqual = true;
+        private int maxCollectionElements = 10_000;
+        private long maxCompareTimeMillis = 200L;
+        private boolean enableSamplingOnHuge = true;
+        private int stride = 100;
+        private int maxFieldsPerClass = 1_000;
         
         public Builder withStrategy(ComparisonStrategy strategy) {
             this.strategy = strategy;
@@ -86,17 +93,52 @@ public class DeepObjectComparator {
             return this;
         }
         
+        public Builder withMaxCollectionElements(int maxCollectionElements) {
+            this.maxCollectionElements = Math.max(0, maxCollectionElements);
+            return this;
+        }
+        
+        public Builder withMaxCompareTimeMillis(long maxCompareTimeMillis) {
+            this.maxCompareTimeMillis = Math.max(0L, maxCompareTimeMillis);
+            return this;
+        }
+        
+        public Builder enableSamplingOnHuge(boolean enableSamplingOnHuge) {
+            this.enableSamplingOnHuge = enableSamplingOnHuge;
+            return this;
+        }
+        
+        public Builder withStride(int stride) {
+            this.stride = Math.max(1, stride);
+            return this;
+        }
+        
+        public Builder withMaxFieldsPerClass(int maxFieldsPerClass) {
+            // Enforce an absolute upper bound of 100 fields per class
+            int sanitized = Math.max(1, maxFieldsPerClass);
+            this.maxFieldsPerClass = Math.min(100, sanitized);
+            return this;
+        }
+        
         public DeepObjectComparator build() {
-            return new DeepObjectComparator(strategy, fieldsToIgnore, maxDepth, compareNullsAsEqual);
+            return new DeepObjectComparator(strategy, fieldsToIgnore, maxDepth, compareNullsAsEqual,
+                    maxCollectionElements, maxCompareTimeMillis, enableSamplingOnHuge, stride, maxFieldsPerClass);
         }
     }
     
     private DeepObjectComparator(ComparisonStrategy strategy, Set<String> fieldsToIgnore, 
-                                 int maxDepth, boolean compareNullsAsEqual) {
+                                 int maxDepth, boolean compareNullsAsEqual,
+                                 int maxCollectionElements, long maxCompareTimeMillis,
+                                 boolean enableSamplingOnHuge, int stride, int maxFieldsPerClass) {
         this.strategy = strategy;
         this.fieldsToIgnore = new HashSet<>(fieldsToIgnore);
         this.maxDepth = maxDepth;
         this.compareNullsAsEqual = compareNullsAsEqual;
+        this.maxCollectionElements = maxCollectionElements;
+        this.maxCompareTimeMillis = maxCompareTimeMillis;
+        this.enableSamplingOnHuge = enableSamplingOnHuge;
+        this.stride = stride;
+        this.maxFieldsPerClass = maxFieldsPerClass;
     }
     
     public static Builder builder() {
@@ -134,29 +176,27 @@ public class DeepObjectComparator {
      * Main comparison method
      */
     public <T> boolean areEqual(T obj1, T obj2) {
-        // Fast path: same reference
         if (obj1 == obj2) {
             return true;
         }
         
-        // Handle nulls
         if (obj1 == null || obj2 == null) {
             return compareNullsAsEqual && obj1 == null && obj2 == null;
         }
         
-        // Type check
         if (!obj1.getClass().equals(obj2.getClass())) {
             return false;
         }
         
+        long startedAtNanos = System.nanoTime();
         try {
             switch (strategy) {
                 case JSON_BASED:
                     return compareUsingJson(obj1, obj2);
                 case REFLECTION_BASED:
-                    return compareUsingReflection(obj1, obj2, 0, new HashSet<>());
+                    return compareUsingReflection(obj1, obj2, 0, new HashSet<>(), startedAtNanos);
                 case COLLECTION_OPTIMIZED:
-                    return compareOptimized(obj1, obj2);
+                    return compareOptimized(obj1, obj2, startedAtNanos);
                 case HYBRID:
                 default:
                     return compareHybrid(obj1, obj2);
@@ -201,9 +241,12 @@ public class DeepObjectComparator {
     /**
      * Reflection-based comparison
      */
-    private boolean compareUsingReflection(Object obj1, Object obj2, int depth, Set<Integer> visited) {
+    private boolean compareUsingReflection(Object obj1, Object obj2, int depth, Set<Integer> visited, long startedAtNanos) {
         if (depth > maxDepth) {
             return true; // Assume equal at max depth to prevent stack overflow
+        }
+        if (timeBudgetExceededAndLog("reflection", startedAtNanos)) {
+            return false;
         }
         
         // Circular reference detection using identity hash codes
@@ -225,17 +268,17 @@ public class DeepObjectComparator {
         
         // Handle collections
         if (obj1 instanceof Collection) {
-            return compareCollections((Collection<?>) obj1, (Collection<?>) obj2, depth, visited);
+            return compareCollections((Collection<?>) obj1, (Collection<?>) obj2, depth, visited, startedAtNanos);
         }
         
         // Handle maps
         if (obj1 instanceof Map) {
-            return compareMaps((Map<?, ?>) obj1, (Map<?, ?>) obj2, depth, visited);
+            return compareMaps((Map<?, ?>) obj1, (Map<?, ?>) obj2, depth, visited, startedAtNanos);
         }
         
         // Handle arrays
         if (clazz.isArray()) {
-            return compareArrays(obj1, obj2, depth, visited);
+            return compareArrays(obj1, obj2, depth, visited, startedAtNanos);
         }
         
         // Compare fields
@@ -250,11 +293,14 @@ public class DeepObjectComparator {
                 Object value1 = field.get(obj1);
                 Object value2 = field.get(obj2);
                 
-                if (!compareFieldValues(value1, value2, depth + 1, visited)) {
+                if (!compareFieldValues(value1, value2, depth + 1, visited, startedAtNanos)) {
                     return false;
                 }
             } catch (IllegalAccessException e) {
                 log.debug("Cannot access field {}: {}", field.getName(), e.getMessage());
+                return false;
+            }
+            if (timeBudgetExceededAndLog("fields", startedAtNanos)) {
                 return false;
             }
         }
@@ -265,7 +311,7 @@ public class DeepObjectComparator {
     /**
      * Compare field values recursively
      */
-    private boolean compareFieldValues(Object value1, Object value2, int depth, Set<Integer> visited) {
+    private boolean compareFieldValues(Object value1, Object value2, int depth, Set<Integer> visited, long startedAtNanos) {
         if (value1 == value2) {
             return true;
         }
@@ -280,7 +326,7 @@ public class DeepObjectComparator {
             return Objects.equals(value1, value2);
         }
         
-        return compareUsingReflection(value1, value2, depth, visited);
+        return compareUsingReflection(value1, value2, depth, visited, startedAtNanos);
     }
     
     /**
@@ -305,35 +351,72 @@ public class DeepObjectComparator {
     /**
      * Optimized comparison for collections and simple objects
      */
-    private <T> boolean compareOptimized(T obj1, T obj2) {
+    private <T> boolean compareOptimized(T obj1, T obj2, long startedAtNanos) {
         if (obj1 instanceof Collection) {
-            return compareCollections((Collection<?>) obj1, (Collection<?>) obj2, 0, new HashSet<>());
+            return compareCollections((Collection<?>) obj1, (Collection<?>) obj2, 0, new HashSet<>(), startedAtNanos);
         } else if (obj1 instanceof Map) {
-            return compareMaps((Map<?, ?>) obj1, (Map<?, ?>) obj2, 0, new HashSet<>());
+            return compareMaps((Map<?, ?>) obj1, (Map<?, ?>) obj2, 0, new HashSet<>(), startedAtNanos);
         } else {
-            return compareUsingReflection(obj1, obj2, 0, new HashSet<>());
+            return compareUsingReflection(obj1, obj2, 0, new HashSet<>(), startedAtNanos);
         }
     }
     
     /**
      * Compare collections efficiently
      */
-    private boolean compareCollections(Collection<?> col1, Collection<?> col2, int depth, Set<Integer> visited) {
+    private boolean compareCollections(Collection<?> col1, Collection<?> col2, int depth, Set<Integer> visited, long startedAtNanos) {
+        if (timeBudgetExceededAndLog("collections", startedAtNanos)) {
+            return false;
+        }
         if (col1.size() != col2.size()) {
             return false;
         }
         
         // For lists, compare in order
         if (col1 instanceof List && col2 instanceof List) {
-            Iterator<?> it1 = col1.iterator();
-            Iterator<?> it2 = col2.iterator();
-            
-            while (it1.hasNext()) {
-                if (!compareFieldValues(it1.next(), it2.next(), depth + 1, visited)) {
-                    return false;
+            List<?> l1 = (List<?>) col1;
+            List<?> l2 = (List<?>) col2;
+            int size = l1.size();
+            if (enableSamplingOnHuge && maxCollectionElements > 0 && size > maxCollectionElements) {
+                // Head/Tail sampling
+                int headTail = Math.min(50, size); // fixed small sample for head/tail
+                if (log.isWarnEnabled()) {
+                    log.warn("Deep comparison sampling activated for large list (size={}) - maxCollectionElements={}, stride={}, headTail={}",
+                            size, maxCollectionElements, this.stride, headTail);
                 }
+                for (int i = 0; i < headTail; i++) {
+                    if (!compareFieldValues(l1.get(i), l2.get(i), depth + 1, visited, startedAtNanos)) {
+                        return false;
+                    }
+                    if (!compareFieldValues(l1.get(size - 1 - i), l2.get(size - 1 - i), depth + 1, visited, startedAtNanos)) {
+                        return false;
+                    }
+                    if (timeBudgetExceededAndLog("collections[list-sampling]", startedAtNanos)) {
+                        return false;
+                    }
+                }
+                // Stride sampling
+                int step = Math.max(1, this.stride);
+                for (int i = 0; i < size; i += step) {
+                    if (!compareFieldValues(l1.get(i), l2.get(i), depth + 1, visited, startedAtNanos)) {
+                        return false;
+                    }
+                    if (timeBudgetExceededAndLog("collections[list-sampling]", startedAtNanos)) {
+                        return false;
+                    }
+                }
+                return true;
+            } else {
+                for (int i = 0; i < size; i++) {
+                    if (!compareFieldValues(l1.get(i), l2.get(i), depth + 1, visited, startedAtNanos)) {
+                        return false;
+                    }
+                    if (timeBudgetExceededAndLog("collections[list]", startedAtNanos)) {
+                        return false;
+                    }
+                }
+                return true;
             }
-            return true;
         }
         
         // For sets, check containment
@@ -351,7 +434,7 @@ public class DeepObjectComparator {
                     List<Comparable> sortableList2 = (List<Comparable>) list2;
                     Collections.sort(sortableList1);
                     Collections.sort(sortableList2);
-                    return compareCollections(sortableList1, sortableList2, depth, visited);
+                    return compareCollections(sortableList1, sortableList2, depth, visited, startedAtNanos);
                 } else {
                     // Elements not comparable, use default equals
                     return col1.equals(col2);
@@ -368,7 +451,10 @@ public class DeepObjectComparator {
     /**
      * Compare maps efficiently
      */
-    private boolean compareMaps(Map<?, ?> map1, Map<?, ?> map2, int depth, Set<Integer> visited) {
+    private boolean compareMaps(Map<?, ?> map1, Map<?, ?> map2, int depth, Set<Integer> visited, long startedAtNanos) {
+        if (timeBudgetExceededAndLog("maps", startedAtNanos)) {
+            return false;
+        }
         if (map1.size() != map2.size()) {
             return false;
         }
@@ -379,7 +465,10 @@ public class DeepObjectComparator {
                 return false;
             }
             
-            if (!compareFieldValues(entry.getValue(), map2.get(key), depth + 1, visited)) {
+            if (!compareFieldValues(entry.getValue(), map2.get(key), depth + 1, visited, startedAtNanos)) {
+                return false;
+            }
+            if (timeBudgetExceededAndLog("maps", startedAtNanos)) {
                 return false;
             }
         }
@@ -390,7 +479,10 @@ public class DeepObjectComparator {
     /**
      * Compare arrays
      */
-    private boolean compareArrays(Object arr1, Object arr2, int depth, Set<Integer> visited) {
+    private boolean compareArrays(Object arr1, Object arr2, int depth, Set<Integer> visited, long startedAtNanos) {
+        if (timeBudgetExceededAndLog("arrays", startedAtNanos)) {
+            return false;
+        }
         if (arr1.getClass().getComponentType().isPrimitive()) {
             return comparePrimitiveArrays(arr1, arr2);
         }
@@ -403,7 +495,10 @@ public class DeepObjectComparator {
         }
         
         for (int i = 0; i < array1.length; i++) {
-            if (!compareFieldValues(array1[i], array2[i], depth + 1, visited)) {
+            if (!compareFieldValues(array1[i], array2[i], depth + 1, visited, startedAtNanos)) {
+                return false;
+            }
+            if (timeBudgetExceededAndLog("arrays", startedAtNanos)) {
                 return false;
             }
         }
@@ -448,6 +543,13 @@ public class DeepObjectComparator {
                 fields.addAll(Arrays.asList(c.getDeclaredFields()));
                 c = c.getSuperclass();
             }
+            if (fields.size() > maxFieldsPerClass) {
+                if (log.isWarnEnabled()) {
+                    log.warn("Deep comparison field cap reached for class {}: {} fields > maxFieldsPerClass={}, truncating",
+                            clazz.getName(), fields.size(), maxFieldsPerClass);
+                }
+                return fields.subList(0, maxFieldsPerClass).toArray(new Field[0]);
+            }
             return fields.toArray(new Field[0]);
         });
     }
@@ -475,5 +577,20 @@ public class DeepObjectComparator {
                type == Byte.class ||
                type == Character.class ||
                type == Short.class;
+    }
+
+    private boolean timeBudgetExceededAndLog(String where, long startedAtNanos) {
+        if (this.maxCompareTimeMillis <= 0L) {
+            return false;
+        }
+        long elapsedMillis = (System.nanoTime() - startedAtNanos) / 1_000_000L;
+        if (elapsedMillis > this.maxCompareTimeMillis) {
+            if (log.isWarnEnabled()) {
+                log.warn("Deep comparison time budget exceeded (>{} ms) at {} after {} ms; returning early",
+                        this.maxCompareTimeMillis, where, elapsedMillis);
+            }
+            return true;
+        }
+        return false;
     }
 }

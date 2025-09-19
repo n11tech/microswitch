@@ -292,7 +292,7 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
 
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("Invalid weight format: " + weight +
-                    ". Expected binary format: '1/0' (Blue active) or '0/1' (Green active)");
+                    ". Expected binary format: '1/0' (Blue active) or '0/1' (Green active).Continuing with the stable version...");
         }
     }
 }
