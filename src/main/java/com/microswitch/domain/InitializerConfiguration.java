@@ -1,27 +1,39 @@
 package com.microswitch.domain;
 
+import com.microswitch.domain.value.MethodType;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.AccessLevel;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @ConfigurationProperties(prefix = "microswitch")
 @Getter
 @Setter
 public class InitializerConfiguration {
 
-    private boolean enabled = true;
+    private Boolean enabled = true;
     private String logger = "disable"; // Default: disable execution logging
-    private java.util.Map<String, DeployableServices> services = new java.util.HashMap<>();
+    private Map<String, DeployableServices> services = new HashMap<>();
+
+    public boolean isEnabled() {
+        return enabled;
+    }
 
     @Getter
     @Setter
     public static class DeployableServices {
-        private boolean enabled = true;
+        private Boolean enabled = true;
         private String activeStrategy = "canary";
         private Canary canary = new Canary();
         private BlueGreen blueGreen = new BlueGreen();
         private Shadow shadow = new Shadow();
+
+        public Boolean isEnabled() {
+            return enabled;
+        }
     }
 
     @Getter
@@ -35,19 +47,34 @@ public class InitializerConfiguration {
     @Setter
     public static class BlueGreen {
         private String weight = "1/0";
-        private int ttl = 300;
+        // Use wrapper to allow null during binding when value is empty string
+        private Integer ttl = 300;
 
+        // Support numeric binding
         public void setTtl(long ttl) {
             this.ttl = (int) ttl;
+        }
+
+        // Gracefully handle empty string values from configuration sources
+        public void setTtl(String ttl) {
+            if (ttl == null || ttl.isBlank()) {
+                // keep current/default value
+                return;
+            }
+            try {
+                this.ttl = Integer.parseInt(ttl.trim());
+            } catch (NumberFormatException ignored) {
+                // leave as-is if unparsable; Spring will surface validation elsewhere if needed
+            }
         }
     }
 
     @Getter
     @Setter
     public static class Shadow {
-        private int percentage = 20;
-        private com.microswitch.domain.value.MethodType stable = com.microswitch.domain.value.MethodType.PRIMARY;
-        private com.microswitch.domain.value.MethodType mirror = com.microswitch.domain.value.MethodType.SECONDARY;
+        private Integer percentage = 20;
+        private MethodType stable = MethodType.PRIMARY;
+        private MethodType mirror = MethodType.SECONDARY;
         // Legacy simple toggle kept for backward compatibility. Prefer using nested 'comparator.mode'.
         @Deprecated
         private String comparatorMode = "disable"; // Default: disable deep comparison
@@ -67,19 +94,19 @@ public class InitializerConfiguration {
         }
 
         public void setMirrorPercentage(short mirrorPercentage) {
-            this.percentage = mirrorPercentage;
+            this.percentage = (int) mirrorPercentage;
         }
 
         public void setMirrorPercentage(Short mirrorPercentage) {
-            this.percentage = mirrorPercentage != null ? mirrorPercentage : 20;
+            this.percentage = Integer.valueOf(mirrorPercentage != null ? mirrorPercentage : 20);
         }
 
-        public void setStable(com.microswitch.domain.value.MethodType stable) {
-            this.stable = stable != null ? stable : com.microswitch.domain.value.MethodType.PRIMARY;
+        public void setStable(MethodType stable) {
+            this.stable = stable != null ? stable : MethodType.PRIMARY;
         }
 
-        public void setMirror(com.microswitch.domain.value.MethodType mirror) {
-            this.mirror = mirror != null ? mirror : com.microswitch.domain.value.MethodType.SECONDARY;
+        public void setMirror(MethodType mirror) {
+            this.mirror = mirror != null ? mirror : MethodType.SECONDARY;
         }
 
         // --- Compatibility and new configuration accessors ---
@@ -127,29 +154,33 @@ public class InitializerConfiguration {
             /**
              * Upper threshold to switch from full element-wise comparison to sampling.
              */
-            private int maxCollectionElements = 10_000;
+            private Integer maxCollectionElements = 10_000;
             /**
              * Time budget in milliseconds for a comparison run. Exceeding it should short-circuit.
              */
-            private long maxCompareTimeMillis = 200L;
+            private Long maxCompareTimeMillis = 200L;
             /**
              * When true and threshold exceeded, comparator switches to sampling instead of full scan.
              */
-            private boolean enableSamplingOnHuge = true;
+            private Boolean enableSamplingOnHuge = true;
             /**
              * Sampling stride/step for large lists when sampling is enabled.
              */
-            private int stride = 100;
+            private Integer stride = 100;
             /**
              * Maximum number of reflected fields per class to consider during deep comparison.
              * Prevents excessive work on pathological or generated classes.
              */
-            private int maxFieldsPerClass = 100; // Hard max enforced
+            private Integer maxFieldsPerClass = 100; // Hard max enforced
 
             // Enforce absolute upper bound of 100 regardless of provided value
             public void setMaxFieldsPerClass(int maxFieldsPerClass) {
-                int sanitized = Math.max(1, maxFieldsPerClass);
+                var sanitized = Math.max(1, maxFieldsPerClass);
                 this.maxFieldsPerClass = Math.min(100, sanitized);
+            }
+
+            public boolean isEnableSamplingOnHuge() {
+                return enableSamplingOnHuge;
             }
         }
     }
