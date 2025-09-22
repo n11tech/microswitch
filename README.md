@@ -155,6 +155,8 @@ String result = deploymentManager.blueGreen(
 
 ## Release Notes
 
+See the full changelog here: [CHANGELOG.md](CHANGELOG.md)
+
 ### Version 1.2.2 (Latest)
 
 #### New in 1.2.2 — Shadow Deep Comparator Tuning & WARN Visibility
@@ -752,7 +754,7 @@ public class Application {
 <dependency>
   <groupId>com.n11.development</groupId>
   <artifactId>microswitch</artifactId>
-  <version>1.1.2</version>
+  <version>1.2.2</version>
 </dependency>
 ```
 
