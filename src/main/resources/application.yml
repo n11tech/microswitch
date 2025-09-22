@@ -13,6 +13,22 @@ microswitch:
   # Map of service configurations by service key/name.
   # Replace example keys (order-service, payment-service) with your actual service identifiers.
   services:
+    # Configuration used by unit tests (ShadowDeepComparisonTest) to enable deep comparison.
+    test-service:
+      enabled: true
+      activeStrategy: shadow
+      shadow:
+        stable: primary
+        mirror: secondary
+        # Ensure mirror path runs frequently during tests
+        mirrorPercentage: 100
+        comparator:
+          mode: enable
+          maxCollectionElements: 10000
+          maxCompareTimeMillis: 200
+          enableSamplingOnHuge: true
+          stride: 100
+          maxFieldsPerClass: 100
     order-service:
       enabled: true
       # Active deployment strategy for this service (canary, shadow, blueGreen)

@@ -14,6 +14,9 @@ module com.n11.development.microswitch {
     opens com.microswitch.application.metric to spring.beans, spring.context;
     opens com.microswitch.infrastructure.external to spring.beans, spring.context, spring.boot.actuator;
     opens com.microswitch.domain to spring.boot.autoconfigure;
+    // Allow Spring Core test utilities (ReflectionUtils/ReflectionTestUtils) to access
+    // private fields in strategy tests under this package
+    opens com.microswitch.domain.strategy to spring.core;
 
     // Spring Boot and Spring Framework dependencies
     requires spring.boot;
