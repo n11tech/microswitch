@@ -1,5 +1,7 @@
 package com.microswitch.domain.value;
 
+import lombok.Getter;
+
 /**
  * Enum representing different deployment strategy types.
  * 
@@ -9,24 +11,21 @@ package com.microswitch.domain.value;
  * - Case-insensitive value matching
  * - Clear error messages for invalid values
  */
+@Getter
 public enum StrategyType {
     CANARY("canary"),
     BLUE_GREEN("blueGreen"),
     SHADOW("shadow");
 
+    /**
+     * -- GETTER --
+     *  Gets the string value of this strategy type.
+     *
+     */
     private final String value;
 
     StrategyType(String value) {
         this.value = value;
-    }
-
-    /**
-     * Gets the string value of this strategy type.
-     * 
-     * @return the string value
-     */
-    public String getValue() {
-        return value;
     }
 
     /**

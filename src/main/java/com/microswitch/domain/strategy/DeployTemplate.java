@@ -25,6 +25,10 @@ public abstract class DeployTemplate {
             throw new IllegalArgumentException("Service key cannot be null or empty");
         }
 
+        if (!configuration.isEnabled()) {
+            return null;
+        }
+
         var deployableService = configuration.getServices().get(serviceKey);
         if (deployableService == null || !deployableService.isEnabled()) {
             return null;
