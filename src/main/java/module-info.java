@@ -1,4 +1,4 @@
-module com.n11.development.microswitch {
+module io.development.n11tech.microswitch {
     // Export ONLY the public API - DeploymentManager
     // This is the ONLY class that consuming applications can access
     exports com.microswitch.infrastructure.manager;
