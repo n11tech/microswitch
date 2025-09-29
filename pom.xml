@@ -13,7 +13,7 @@
 
     <groupId>io.development.n11tech</groupId>
     <artifactId>microswitch</artifactId>
-    <version>1.2.2</version>
+    <version>1.4.6</version>
     <packaging>jar</packaging>
 
     <name>microswitch</name>
@@ -37,7 +37,7 @@
 
     <developers>
         <developer>
-            <name>n11 development team</name>
+            <name>n11 Architecture and Staff Team</name>
         </developer>
     </developers>
 

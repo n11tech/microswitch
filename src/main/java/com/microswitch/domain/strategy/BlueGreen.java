@@ -34,6 +34,7 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
     public record BlueGreenConfig(Long ttl, String weight) {
         public BlueGreenConfig {
             if (ttl != null && ttl < 0) {
+                log.error("[MICROSWITCH-EXCEPTION] - Invalid TTL value: {}, must be non-negative", ttl);
                 throw new IllegalArgumentException("TTL must be non-negative, got: " + ttl);
             }
 
@@ -46,6 +47,7 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
             try {
                 var weights = weight.split("/");
                 if (weights.length != 2) {
+                    log.error("[MICROSWITCH-EXCEPTION] - Invalid weight format '{}', expected exactly 2 parts separated by '/'", weight);
                     throw new IllegalArgumentException("Weight must be in format 'blue/green', got: " + weight);
                 }
 
@@ -53,9 +55,11 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
                 var greenWeight = Integer.parseInt(weights[1].trim());
 
                 if (!((blueWeight == 1 && greenWeight == 0) || (blueWeight == 0 && greenWeight == 1))) {
+                    log.error("[MICROSWITCH-EXCEPTION] - Invalid binary weight values: blue={}, green={}, must be '1/0' or '0/1'", blueWeight, greenWeight);
                     throw new IllegalArgumentException("Blue-Green weights must be binary: '1/0' or '0/1', got: " + weight);
                 }
             } catch (NumberFormatException e) {
+                log.error("[MICROSWITCH-EXCEPTION] - Number format error in weight '{}': {}", weight, e.getMessage());
                 throw new IllegalArgumentException("Invalid weight format: " + weight + ". Expected binary format: '1/0' (Blue) or '0/1' (Green)");
             }
         }
@@ -68,12 +72,15 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
     @Override
     public <R> R execute(Supplier<R> blue, Supplier<R> green, String serviceKey) {
         if (blue == null) {
+            log.error("[MICROSWITCH-EXCEPTION] - Blue supplier is null in execute method");
             throw new IllegalArgumentException("Blue supplier cannot be null");
         }
         if (green == null) {
+            log.error("[MICROSWITCH-EXCEPTION] - Green supplier is null in execute method");
             throw new IllegalArgumentException("Green supplier cannot be null");
         }
         if (serviceKey == null || serviceKey.trim().isEmpty()) {
+            log.error("[MICROSWITCH-EXCEPTION] - Invalid service key: '{}', cannot be null or empty", serviceKey);
             throw new IllegalArgumentException("Service key cannot be null or empty");
         }
 
@@ -112,7 +119,7 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
 
                 return new BlueGreenConfig(ttl, weight);
             } catch (Exception e) {
-                log.warn("Failed to create BlueGreenConfig for service {}: {}", serviceKey, e.getMessage());
+                log.warn("[MICROSWITCH-BLUEGREEN] - Failed to create BlueGreenConfig for service {}: {}", serviceKey, e.getMessage());
                 return null;
             }
         });
@@ -126,7 +133,7 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
             var method = config.getClass().getMethod("getBlueGreen");
             return method.invoke(config);
         } catch (Exception e) {
-            log.debug("No BlueGreen configuration found for service");
+            log.debug("[MICROSWITCH-BLUEGREEN] - No BlueGreen configuration found for service");
             return null;
         }
     }
@@ -151,12 +158,12 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
                     return l;
                 }
                 default -> {
-                    log.warn("Unexpected TTL type: {}, expected Integer or Long", result.getClass());
+                    log.warn("[MICROSWITCH-BLUEGREEN] - Unexpected TTL type: {}, expected Integer or Long", result.getClass());
                     return null;
                 }
             }
         } catch (Exception e) {
-            log.debug("Failed to extract TTL from configuration: {}", e.getMessage());
+            log.debug("[MICROSWITCH-BLUEGREEN] - Failed to extract TTL from configuration: {}", e.getMessage());
             return null;
         }
     }
@@ -288,9 +295,11 @@ public class BlueGreen extends DeployTemplate implements DeploymentStrategy {
                 }
             }
 
+            log.error("[MICROSWITCH-EXCEPTION] - Invalid weight configuration '{}', must be binary format", weight);
             throw new IllegalArgumentException("Blue-Green weights must be binary: '1/0' (Blue active) or '0/1' (Green active)");
 
         } catch (NumberFormatException e) {
+            log.error("[MICROSWITCH-EXCEPTION] - Number format error in weight parsing '{}': {}", weight, e.getMessage());
             throw new IllegalArgumentException("Invalid weight format: " + weight +
                     ". Expected binary format: '1/0' (Blue active) or '0/1' (Green active).Continuing with the stable version...");
         }

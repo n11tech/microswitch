@@ -113,6 +113,7 @@ public class InitializerConfiguration {
         }
 
         // --- Compatibility and new configuration accessors ---
+
         /**
          * Backward compatible getter for the comparator mode string.
          */
@@ -155,21 +156,14 @@ public class InitializerConfiguration {
              */
             private String mode = "disable";
             /**
-             * Upper threshold to switch from full element-wise comparison to sampling.
-             */
-            private Integer maxCollectionElements = 10_000;
-            /**
              * Time budget in milliseconds for a comparison run. Exceeding it should short-circuit.
              */
             private Long maxCompareTimeMillis = 200L;
             /**
-             * When true and threshold exceeded, comparator switches to sampling instead of full scan.
+             * Sampling configuration for very large collections. New nested structure.
+             * Backward compatibility: legacy flat fields are still accepted via delegating setters.
              */
-            private Boolean enableSamplingOnHuge = true;
-            /**
-             * Sampling stride/step for large lists when sampling is enabled.
-             */
-            private Integer stride = 100;
+            private SamplingOnHuge samplingOnHuge = new SamplingOnHuge();
             /**
              * Maximum number of reflected fields per class to consider during deep comparison.
              * Prevents excessive work on pathological or generated classes.
@@ -182,8 +176,20 @@ public class InitializerConfiguration {
                 this.maxFieldsPerClass = Math.min(100, sanitized);
             }
 
-            public boolean isEnableSamplingOnHuge() {
-                return enableSamplingOnHuge;
+            /**
+             * Nested config holding sampling toggles and parameters for huge collections.
+             */
+            @Getter
+            @Setter
+            public static class SamplingOnHuge {
+                /** When true and threshold exceeded, comparator switches to sampling instead of full scan. */
+                private Boolean enable = false;
+                /**
+                 * Upper threshold to switch from full element-wise comparison to sampling.
+                 */
+                private Integer maxCollectionElements = 1000;
+                /** Sampling stride/step for large lists when sampling is enabled. */
+                private Integer stride = 10;
             }
         }
     }

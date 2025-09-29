@@ -156,6 +156,16 @@ public class DeploymentStrategyExecutor {
      */
     private <R> R executeStrategyByType(StrategyType strategyType, Supplier<R> primary, 
                                        Supplier<R> secondary, String serviceKey) {
+        if (!properties.isEnabled()) {
+            log.info("[MICROSWITCH-DISABLED] Microswitch is disabled globally, returning primary instance for service: '{}'", serviceKey);
+            return primary.get();
+        }
+        
+        if (!isServiceEnabled(serviceKey)) {
+            log.info("[MICROSWITCH-DISABLED] Service '{}' is disabled, returning primary instance", serviceKey);
+            return primary.get();
+        }
+        
         if (isExecutionLoggingEnabled()) {
             log.info("[MICROSWITCH-EXEC] Starting execution - Service: '{}', Strategy: '{}'", 
                     serviceKey, strategyType.getValue());
@@ -217,6 +227,27 @@ public class DeploymentStrategyExecutor {
     private boolean isExecutionLoggingEnabled() {
         return properties != null && 
                "enable".equalsIgnoreCase(properties.getLogger());
+    }
+
+    /**
+     * Checks if the specific service is enabled in the configuration.
+     * 
+     * @param serviceKey the service key to check
+     * @return true if service is enabled, false if disabled or not configured
+     */
+    private boolean isServiceEnabled(String serviceKey) {
+        if (properties == null || properties.getServices() == null) {
+            return false;
+        }
+        
+        InitializerConfiguration.DeployableServices serviceConfig = properties.getServices().get(serviceKey);
+        if (serviceConfig == null) {
+            log.warn("[MICROSWITCH-CONFIG] Service '{}' not found in configuration, treating as disabled", serviceKey);
+            return false;
+        }
+        
+        Boolean enabled = serviceConfig.getEnabled();
+        return enabled != null && enabled;
     }
 
     private DeploymentStrategy getRequiredStrategy(StrategyType type) {

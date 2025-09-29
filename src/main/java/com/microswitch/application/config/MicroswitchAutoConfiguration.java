@@ -49,10 +49,10 @@ public class MicroswitchAutoConfiguration {
     @Bean
     public String logInitialization() {
         if (properties != null && properties.isEnabled()) {
-            log.info("Microswitch library initialized and ENABLED - deployment strategies are now available");
+            log.info("[MICROSWITCH-INIT] - Microswitch library initialized and ENABLED - deployment strategies are now available");
             return "microswitch-enabled";
         } else {
-            log.info("Microswitch library initialized but DISABLED - DeploymentManager bean is available but strategies are disabled");
+            log.info("[MICROSWITCH-INIT] - Microswitch library initialized but DISABLED - DeploymentManager bean is available but strategies are disabled");
             return "microswitch-disabled";
         }
     }

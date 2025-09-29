@@ -1,4 +1,4 @@
-module io.development.n11tech.microswitch {
+module com.n11.development.microswitch {
     // Export ONLY the public API - DeploymentManager
     // This is the ONLY class that consuming applications can access
     exports com.microswitch.infrastructure.manager;
@@ -14,12 +14,17 @@ module io.development.n11tech.microswitch {
     opens com.microswitch.application.metric to spring.beans, spring.context;
     opens com.microswitch.infrastructure.external to spring.beans, spring.context, spring.boot.actuator;
     opens com.microswitch.domain to spring.boot.autoconfigure;
+    // Allow Spring Core test utilities (ReflectionUtils/ReflectionTestUtils) to access
+    // private fields in strategy tests under this package
+    opens com.microswitch.domain.strategy to spring.core;
 
     // Spring Boot and Spring Framework dependencies
     requires spring.boot;
     requires spring.boot.autoconfigure;
     requires spring.context;
     requires spring.beans;
+    // Spring Core for org.springframework.lang.* annotations (e.g., NonNullApi)
+    requires spring.core;
 
     // Configuration processor for @ConfigurationProperties
     requires static spring.boot.configuration.processor;
@@ -42,4 +47,5 @@ module io.development.n11tech.microswitch {
 
     // Lombok is used at compile-time only; mark as static
     requires static lombok;
+    requires java.desktop;
 }
