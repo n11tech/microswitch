@@ -13,7 +13,7 @@
 
     <groupId>com.n11.development</groupId>
     <artifactId>microswitch</artifactId>
-    <version>1.3.4</version>
+    <version>1.3.5</version>
     <packaging>jar</packaging>
 
     <name>microswitch</name>
@@ -37,7 +37,7 @@
 
     <developers>
         <developer>
-            <name>Fatih Karaman</name>
+            <name>n11 Architecture and Staff Team</name>
         </developer>
     </developers>
 
