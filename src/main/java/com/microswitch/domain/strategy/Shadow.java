@@ -38,10 +38,10 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
 
             if (cmpCfg != null) {
                 builder = builder
-                        .withMaxCollectionElements(cmpCfg.getMaxCollectionElements())
+                        .withMaxCollectionElements(cmpCfg.getSamplingOnHuge().getMaxCollectionElements())
                         .withMaxCompareTimeMillis(cmpCfg.getMaxCompareTimeMillis())
-                        .enableSamplingOnHuge(cmpCfg.isEnableSamplingOnHuge())
-                        .withStride(cmpCfg.getStride())
+                        .enableSamplingOnHuge(cmpCfg.getSamplingOnHuge().getEnable())
+                        .withStride(cmpCfg.getSamplingOnHuge().getStride())
                         .withMaxFieldsPerClass(cmpCfg.getMaxFieldsPerClass());
             }
 

@@ -24,10 +24,11 @@ microswitch:
         mirrorPercentage: 100
         comparator:
           mode: enable
-          maxCollectionElements: 10000
           maxCompareTimeMillis: 200
-          enableSamplingOnHuge: true
-          stride: 100
+          samplingOnHuge:
+            enable: true
+            maxCollectionElements: 10000
+            stride: 100
           maxFieldsPerClass: 100
     order-service:
       enabled: true
@@ -54,14 +55,16 @@ microswitch:
         comparator:
           # enable | disable (case-insensitive). Legacy single-line `comparator: enable` also supported.
           mode: disable
-          # If a list size exceeds this threshold, sampler mode is activated instead of full scan.
-          maxCollectionElements: 10000
           # Hard time budget for comparison in milliseconds. Exceeding returns early with WARN log.
           maxCompareTimeMillis: 200
-          # When true, activates sampling for very large lists to avoid O(n) full scan cost.
-          enableSamplingOnHuge: true
-          # Sampling step used in stride sampling (every Nth element is compared).
-          stride: 100
+          # Sampling configuration for very large lists.
+          samplingOnHuge:
+            # When true, activates sampling for very large lists to avoid O(n) full scan cost.
+            enable: true
+            # If a list size exceeds this threshold, sampler mode is activated instead of full scan.
+            maxCollectionElements: 10000
+            # Sampling step used in stride sampling (every Nth element is compared).
+            stride: 100
           # Cap the number of reflected fields per class considered during deep comparison.
           # Hard cap: 100 (values above 100 are clamped at runtime)
           maxFieldsPerClass: 100

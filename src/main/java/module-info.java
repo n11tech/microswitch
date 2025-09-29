@@ -47,4 +47,5 @@ module com.n11.development.microswitch {
 
     // Lombok is used at compile-time only; mark as static
     requires static lombok;
+    requires java.desktop;
 }
