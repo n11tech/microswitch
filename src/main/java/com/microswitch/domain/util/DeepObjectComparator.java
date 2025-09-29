@@ -181,6 +181,11 @@ public class DeepObjectComparator {
             return false;
         }
 
+        // Handle numeric type equivalence before class check
+        if (areNumericTypesEquivalent(obj1, obj2)) {
+            return true;
+        }
+
         if (!obj1.getClass().equals(obj2.getClass())) {
             return false;
         }
@@ -284,7 +289,7 @@ public class DeepObjectComparator {
                 Object value1 = field.get(obj1);
                 Object value2 = field.get(obj2);
 
-                if (areFieldValuesDifferent(value1, value2, depth + 1, visited, startedAtNanos)) {
+                if (areFieldValuesDifferent(value1, value2, depth + 1, visited, startedAtNanos, field.getName())) {
                     return false;
                 }
 
@@ -292,7 +297,7 @@ public class DeepObjectComparator {
                     return false;
                 }
             } catch (IllegalAccessException e) {
-                log.debug("[MICROSWITCH-COMPARATOR] - Skipping inaccessible field {}: {}", field.getName(), e.getMessage());
+                log.warn("[MICROSWITCH-COMPARATOR] - Skipping inaccessible field {}: {}", field.getName(), e.getMessage());
                 // Skip inaccessible fields instead of failing the comparison - no continue needed as it's end of iteration
             }
         }
@@ -304,28 +309,71 @@ public class DeepObjectComparator {
      * Check if field values are different (returns true if different, false if equal)
      */
     private boolean areFieldValuesDifferent(Object value1, Object value2, int depth, Set<Integer> visited, long startedAtNanos) {
+        return areFieldValuesDifferent(value1, value2, depth, visited, startedAtNanos, null);
+    }
+
+    /**
+     * Check if field values are different with field context for logging
+     */
+    private boolean areFieldValuesDifferent(Object value1, Object value2, int depth, Set<Integer> visited, long startedAtNanos, String fieldContext) {
         if (value1 == value2) {
             return false; // Same reference, not different
         }
 
         if (value1 == null || value2 == null) {
+            if (log.isWarnEnabled() && fieldContext != null) {
+                log.warn("[MICROSWITCH-COMPARATOR] - Comparison mismatch at field '{}': null vs non-null - values: ({}, {})", 
+                        fieldContext, value1, value2);
+            }
             return true; // One is null, other isn't - they are different
         }
 
-        Class<?> type = value1.getClass();
+        Class<?> type1 = value1.getClass();
+        Class<?> type2 = value2.getClass();
 
-        if (isPrimitiveOrWrapper(type) || type == String.class || type.isEnum()) {
-            return !Objects.equals(value1, value2); // Invert: true if NOT equal
+        // Debug logging for numeric type comparison
+        if (log.isDebugEnabled() && (isNumericType(type1) || isNumericType(type2))) {
+            log.debug("[MICROSWITCH-COMPARATOR] - Comparing values: {} ({}) vs {} ({})", 
+                    value1, type1.getSimpleName(), value2, type2.getSimpleName());
         }
 
-        return !compareUsingReflection(value1, value2, depth, visited, startedAtNanos); // Invert: true if NOT equal
+        if ((isPrimitiveOrWrapper(type1) || type1 == String.class || type1.isEnum()) &&
+            (isPrimitiveOrWrapper(type2) || type2 == String.class || type2.isEnum())) {
+            
+            // Handle numeric type equivalence (Integer vs Long, etc.)
+            if (areNumericTypesEquivalent(value1, value2)) {
+                return false; // Numerically equivalent, not different
+            }
+            
+            boolean areEqual = Objects.equals(value1, value2);
+            if (!areEqual && log.isWarnEnabled() && fieldContext != null) {
+                log.warn("[MICROSWITCH-COMPARATOR] - Comparison mismatch at field '{}': values ({}, {}) - types: ({}, {})", 
+                        fieldContext, value1, value2, type1.getSimpleName(), type2.getSimpleName());
+            }
+            return !areEqual; // Invert: true if NOT equal
+        }
+
+        boolean areEqual = compareUsingReflection(value1, value2, depth, visited, startedAtNanos);
+        if (!areEqual && log.isWarnEnabled() && fieldContext != null) {
+            log.warn("[MICROSWITCH-COMPARATOR] - Comparison mismatch at field '{}': complex objects differ - types: ({}, {})", 
+                    fieldContext, type1.getSimpleName(), type2.getSimpleName());
+        }
+        return !areEqual; // Invert: true if NOT equal
     }
 
     /**
      * Hybrid comparison approach
      */
     private <T> boolean compareHybrid(T obj1, T obj2) {
-        // First try equals() if it's overridden
+        // Handle Collections and Maps specially to ensure numeric equivalence works
+        long startedAtNanos = System.nanoTime();
+        if (obj1 instanceof Collection) {
+            return compareCollections((Collection<?>) obj1, (Collection<?>) obj2, 0, new HashSet<>(), startedAtNanos);
+        } else if (obj1 instanceof Map) {
+            return compareMaps((Map<?, ?>) obj1, (Map<?, ?>) obj2, 0, new HashSet<>(), startedAtNanos);
+        }
+        
+        // For other objects, try equals() if it's overridden
         Class<?> clazz = obj1.getClass();
         try {
             if (clazz.getMethod("equals", Object.class).getDeclaringClass() != Object.class) {
@@ -336,8 +384,8 @@ public class DeepObjectComparator {
             // Should not happen
         }
 
-        // Fall back to JSON comparison
-        return compareUsingJson(obj1, obj2);
+        // Fall back to reflection-based comparison (which handles numeric type equivalence)
+        return compareUsingReflection(obj1, obj2, 0, new HashSet<>(), startedAtNanos);
     }
 
     /**
@@ -378,10 +426,10 @@ public class DeepObjectComparator {
                             log.info("[MICROSWITCH-COMPARATOR] - Headtail is limited to the default size of 1000.");
                     }
                     for (int i = 0; i < headTail; i++) {
-                        if (areFieldValuesDifferent(l1.get(i), l2.get(i), depth + 1, visited, startedAtNanos)) {
+                        if (areFieldValuesDifferent(l1.get(i), l2.get(i), depth + 1, visited, startedAtNanos, "list[" + i + "]")) {
                             return false;
                         }
-                        if (areFieldValuesDifferent(l1.get(size - 1 - i), l2.get(size - 1 - i), depth + 1, visited, startedAtNanos)) {
+                        if (areFieldValuesDifferent(l1.get(size - 1 - i), l2.get(size - 1 - i), depth + 1, visited, startedAtNanos, "list[" + (size - 1 - i) + "]")) {
                             return false;
                         }
                         if (timeBudgetExceededAndLog("collections[list-sampling]", startedAtNanos)) {
@@ -391,7 +439,7 @@ public class DeepObjectComparator {
                 }
                 if (stride > STRIDE_THRESHOLD) {
                     for (int i = 0; i < size; i += stride) {
-                        if (areFieldValuesDifferent(l1.get(i), l2.get(i), depth + 1, visited, startedAtNanos)) {
+                        if (areFieldValuesDifferent(l1.get(i), l2.get(i), depth + 1, visited, startedAtNanos, "list[" + i + "]")) {
                             return false;
                         }
                         if (timeBudgetExceededAndLog("collections[list-sampling]", startedAtNanos)) {
@@ -406,7 +454,7 @@ public class DeepObjectComparator {
             } else {
                 if (size <= COLLECTION_OPTIMIZED_THRESHOLD) {
                     for (int i = 0; i < size; i++) {
-                        if (areFieldValuesDifferent(l1.get(i), l2.get(i), depth + 1, visited, startedAtNanos)) {
+                        if (areFieldValuesDifferent(l1.get(i), l2.get(i), depth + 1, visited, startedAtNanos, "list[" + i + "]")) {
                             return false;
                         }
                         if (timeBudgetExceededAndLog("collections[list]", startedAtNanos)) {
@@ -461,16 +509,23 @@ public class DeepObjectComparator {
             return false;
         }
         if (map1.size() != map2.size()) {
+            if (log.isWarnEnabled()) {
+                log.warn("[MICROSWITCH-COMPARATOR] - Comparison mismatch: map size difference - map1.size()={}, map2.size()={}", 
+                        map1.size(), map2.size());
+            }
             return false;
         }
 
         for (Map.Entry<?, ?> entry : map1.entrySet()) {
             Object key = entry.getKey();
             if (!map2.containsKey(key)) {
+                if (log.isWarnEnabled()) {
+                    log.warn("[MICROSWITCH-COMPARATOR] - Comparison mismatch: missing key '{}' in second map", key);
+                }
                 return false;
             }
 
-            if (areFieldValuesDifferent(entry.getValue(), map2.get(key), depth + 1, visited, startedAtNanos)) {
+            if (areFieldValuesDifferent(entry.getValue(), map2.get(key), depth + 1, visited, startedAtNanos, "map[" + key + "]")) {
                 return false;
             }
             if (timeBudgetExceededAndLog("maps", startedAtNanos)) {
@@ -496,11 +551,15 @@ public class DeepObjectComparator {
         Object[] array2 = (Object[]) arr2;
 
         if (array1.length != array2.length) {
+            if (log.isWarnEnabled()) {
+                log.warn("[MICROSWITCH-COMPARATOR] - Comparison mismatch: array length difference - array1.length={}, array2.length={}", 
+                        array1.length, array2.length);
+            }
             return false;
         }
 
         for (int i = 0; i < array1.length; i++) {
-            if (areFieldValuesDifferent(array1[i], array2[i], depth + 1, visited, startedAtNanos)) {
+            if (areFieldValuesDifferent(array1[i], array2[i], depth + 1, visited, startedAtNanos, "array[" + i + "]")) {
                 return false;
             }
             if (timeBudgetExceededAndLog("arrays", startedAtNanos)) {
@@ -582,6 +641,76 @@ public class DeepObjectComparator {
                 type == Byte.class ||
                 type == Character.class ||
                 type == Short.class;
+    }
+
+    /**
+     * Check if two numeric values are equivalent despite different types
+     * (e.g., Integer(123) vs Long(123L))
+     */
+    private boolean areNumericTypesEquivalent(Object value1, Object value2) {
+        if (value1 == null || value2 == null) {
+            return false;
+        }
+
+        Class<?> type1 = value1.getClass();
+        Class<?> type2 = value2.getClass();
+
+        // If same type, use regular equals
+        if (type1.equals(type2)) {
+            return Objects.equals(value1, value2);
+        }
+
+        // Check if both are numeric types
+        if (isNumericType(type1) && isNumericType(type2)) {
+            // Convert both to BigDecimal for accurate comparison
+            try {
+                java.math.BigDecimal bd1 = convertToBigDecimal(value1);
+                java.math.BigDecimal bd2 = convertToBigDecimal(value2);
+                return bd1.compareTo(bd2) == 0;
+            } catch (Exception e) {
+                // If conversion fails, fall back to string comparison
+                return value1.toString().equals(value2.toString());
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if a type is numeric
+     */
+    private boolean isNumericType(Class<?> type) {
+        return type == Integer.class || type == Long.class || type == Double.class || 
+               type == Float.class || type == Short.class || type == Byte.class ||
+               type == int.class || type == long.class || type == double.class ||
+               type == float.class || type == short.class || type == byte.class ||
+               type == java.math.BigDecimal.class || type == java.math.BigInteger.class;
+    }
+
+    /**
+     * Convert numeric value to BigDecimal for comparison
+     */
+    private java.math.BigDecimal convertToBigDecimal(Object value) {
+        if (value instanceof Integer) {
+            return java.math.BigDecimal.valueOf((Integer) value);
+        } else if (value instanceof Long) {
+            return java.math.BigDecimal.valueOf((Long) value);
+        } else if (value instanceof Double) {
+            return java.math.BigDecimal.valueOf((Double) value);
+        } else if (value instanceof Float) {
+            return java.math.BigDecimal.valueOf((Float) value);
+        } else if (value instanceof Short) {
+            return java.math.BigDecimal.valueOf((Short) value);
+        } else if (value instanceof Byte) {
+            return java.math.BigDecimal.valueOf((Byte) value);
+        } else if (value instanceof java.math.BigDecimal) {
+            return (java.math.BigDecimal) value;
+        } else if (value instanceof java.math.BigInteger) {
+            return new java.math.BigDecimal((java.math.BigInteger) value);
+        } else {
+            // Try to parse as string
+            return new java.math.BigDecimal(value.toString());
+        }
     }
 
     private boolean timeBudgetExceededAndLog(String where, long startedAtNanos) {
