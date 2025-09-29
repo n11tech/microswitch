@@ -26,9 +26,9 @@ microswitch:
           mode: enable
           maxCompareTimeMillis: 200
           samplingOnHuge:
-            enable: true
-            maxCollectionElements: 10000
-            stride: 100
+            enable: false
+            maxCollectionElements: 1000
+            stride: 10
           maxFieldsPerClass: 100
     order-service:
       enabled: true
@@ -60,11 +60,11 @@ microswitch:
           # Sampling configuration for very large lists.
           samplingOnHuge:
             # When true, activates sampling for very large lists to avoid O(n) full scan cost.
-            enable: true
+            enable: false
             # If a list size exceeds this threshold, sampler mode is activated instead of full scan.
-            maxCollectionElements: 10000
+            maxCollectionElements: 1000
             # Sampling step used in stride sampling (every Nth element is compared).
-            stride: 100
+            stride: 10
           # Cap the number of reflected fields per class considered during deep comparison.
           # Hard cap: 100 (values above 100 are clamped at runtime)
           maxFieldsPerClass: 100

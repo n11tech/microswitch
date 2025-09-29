@@ -16,7 +16,7 @@ Older minors may receive fixes on a best-effort basis depending on impact and fe
 
 Please do not open public GitHub issues for security problems. Instead, use one of the private channels below:
 
-- GitHub Security Advisories: https://github.com/n11-development/microswitch/security/advisories/new
+- GitHub Security Advisories: https://github.com/n11tech/microswitch/security/advisories/new
 - Email: development@n11.com
 
 Include as much detail as possible: affected versions, environment, a minimal reproduction, potential impact, and suggested mitigations if known.

@@ -40,9 +40,9 @@ Maven
 
 ```xml
 <dependency>
-  <groupId>com.n11.development</groupId>
+  <groupId>io.development.n11tech</groupId>
   <artifactId>microswitch</artifactId>
-  <version>1.2.2</version>
+  <version>1.4.6</version>
   <scope>compile</scope>
 </dependency>
 ```
@@ -50,7 +50,7 @@ Maven
 Gradle
 
 ```gradle
-implementation 'com.n11.development:microswitch:1.2.2'
+implementation 'io.development.n11tech:microswitch:1.4.6'
 ```
 
 ## Quick Start
@@ -76,10 +76,12 @@ microswitch:
         mirrorPercentage: 10          # mirror every 10% of calls
         comparator:                   # NEW in v1.2.2: nested comparator tuning
           mode: disable               # enable/disable deep comparison
-          maxCollectionElements: 10000
           maxCompareTimeMillis: 200
-          enableSamplingOnHuge: true
-          stride: 100
+          samplingOnHuge:
+            enable: false             # enable sampling for large collections
+            maxCollectionElements: 1000
+            stride: 10
+          maxFieldsPerClass: 100
 ```
 
 2) Inject and use `DeploymentManager`
@@ -157,9 +159,9 @@ String result = deploymentManager.blueGreen(
 
 See the full changelog here: [CHANGELOG.md](CHANGELOG.md)
 
-### Version 1.2.2 (Latest)
+### Version 1.4.6 (Latest)
 
-#### New in 1.2.2 — Shadow Deep Comparator Tuning & WARN Visibility
+#### New in 1.4.6 — Enhanced Stability and Performance
 
 1) Comparator tuning for large data structures (Shadow strategy)
 
@@ -170,10 +172,12 @@ microswitch:
       shadow:
         comparator:
           mode: enable               # enable/disable deep comparison
-          maxCollectionElements: 10000   # switch to sampling for very large lists
           maxCompareTimeMillis: 200      # time budget in ms; returns early when exceeded
-          enableSamplingOnHuge: true     # enable sampling mode for huge lists
-          stride: 100                    # sampling step for lists
+          samplingOnHuge:
+            enable: false            # enable sampling mode for huge lists
+            maxCollectionElements: 1000   # switch to sampling for very large lists
+            stride: 10               # sampling step for lists
+          maxFieldsPerClass: 100
 ```
 
 - Large lists: head/tail + stride sampling prevents O(n) deep scans
@@ -378,10 +382,12 @@ microswitch:
         mirrorPercentage: 20       # mirror 20% of the time
         comparator:
           mode: disable            # deep object comparison (enable/disable)
-          maxCollectionElements: 10000
           maxCompareTimeMillis: 200
-          enableSamplingOnHuge: true
-          stride: 100
+          samplingOnHuge:
+            enable: false          # enable sampling for large collections
+            maxCollectionElements: 1000
+            stride: 10
+          maxFieldsPerClass: 100
 
     user-service:
       enabled: false               # disabled — only stable executes
@@ -403,10 +409,11 @@ microswitch:
 | `services.<key>.shadow.mirror` | Which method is mirrored (`primary` or `secondary`) | `secondary` |
 | `services.<key>.shadow.mirrorPercentage` | Percentage of calls that will trigger a mirror execution (0–100) | `0` |
 | `services.<key>.shadow.comparator.mode` | **v1.2.2**: Enable/disable deep object comparison for shadow validation | `disable` |
-| `services.<key>.shadow.comparator.maxCollectionElements` | **v1.2.2**: Threshold to activate sampling for large lists | `10000` |
 | `services.<key>.shadow.comparator.maxCompareTimeMillis` | **v1.2.2**: Time budget for deep comparison (ms) | `200` |
-| `services.<key>.shadow.comparator.enableSamplingOnHuge` | **v1.2.2**: Enable sampling mode for huge lists | `true` |
-| `services.<key>.shadow.comparator.stride` | **v1.2.2**: Sampling step for list comparison | `100` |
+| `services.<key>.shadow.comparator.samplingOnHuge.enable` | **v1.2.2**: Enable sampling mode for huge lists | `false` |
+| `services.<key>.shadow.comparator.samplingOnHuge.maxCollectionElements` | **v1.2.2**: Threshold to activate sampling for large lists | `1000` |
+| `services.<key>.shadow.comparator.samplingOnHuge.stride` | **v1.2.2**: Sampling step for list comparison | `10` |
+| `services.<key>.shadow.comparator.maxFieldsPerClass` | **v1.2.2**: Maximum reflected fields per class (hard cap: 100) | `100` |
 
 ## Metrics & Actuator
 
@@ -542,7 +549,7 @@ If you use JPMS (module-path), add Microswitch to your `module-info.java`:
 module your.app.module {
   requires spring.boot;
   requires spring.boot.autoconfigure;
-  requires com.n11.development.microswitch; // Microswitch public API
+  requires io.development.n11tech.microswitch; // Microswitch public API
   // ... other requires
 }
 ```
@@ -738,11 +745,11 @@ public void onApplicationReady(ApplicationReadyEvent event) {
 Error: No qualifying bean of type 'DeploymentManager'
 ```
 
-**Solution 1**: If you're using an older version (< v1.1.1), add `com.n11.development` into your `@ComponentScan`:
+**Solution 1**: If you're using an older version (< v1.1.1), add `io.development.n11tech` into your `@ComponentScan`:
 
 ```java
 @SpringBootApplication
-@ComponentScan(basePackages = {"com.yourpackage", "com.n11.development"})
+@ComponentScan(basePackages = {"com.yourpackage", "io.development.n11tech"})
 public class Application {
     // ...
 }
@@ -752,9 +759,9 @@ public class Application {
 
 ```xml
 <dependency>
-  <groupId>com.n11.development</groupId>
+  <groupId>io.development.n11tech</groupId>
   <artifactId>microswitch</artifactId>
-  <version>1.2.2</version>
+  <version>1.4.6</version>
 </dependency>
 ```
 
@@ -780,7 +787,7 @@ public class Application {
 ```yaml
 logging:
   level:
-    com.n11.development: DEBUG
+    io.development.n11tech: DEBUG
 ```
 
 ### Health Check
@@ -812,7 +819,7 @@ public class MicroswitchHealthCheck {
 
 ```java
 module com.example.microswitch {
-    requires com.n11.development.microswitch;
+    requires io.development.n11tech.microswitch;
     // ...
 }
 ```
@@ -843,4 +850,4 @@ https://www.apache.org/licenses/LICENSE-2.0
 ## Support
 
 - Email: development@n11.com
-- Issues: https://github.com/n11-development/microswitch/issues
+- Issues: https://github.com/n11tech/microswitch/issues
