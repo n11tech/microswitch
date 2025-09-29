@@ -167,8 +167,8 @@ class ShadowDeepComparisonTest {
             data.put("nested", Map.of("key", "value"));
 
             List<Person> persons = Arrays.asList(
-                new Person(1L, "User1", new Address("St1", "City1", "11111"), Arrays.asList("hobby1")),
-                new Person(2L, "User2", new Address("St2", "City2", "22222"), Arrays.asList("hobby2"))
+                new Person(1L, "User1", new Address("St1", "City1", "11111"), List.of("hobby1")),
+                new Person(2L, "User2", new Address("St2", "City2", "22222"), List.of("hobby2"))
             );
 
             return new ComplexResult(data, persons, "SUCCESS");
@@ -181,8 +181,8 @@ class ShadowDeepComparisonTest {
             data.put("nested", Map.of("key", "value"));
 
             List<Person> persons = Arrays.asList(
-                new Person(1L, "User1", new Address("St1", "City1", "11111"), Arrays.asList("hobby1")),
-                new Person(2L, "User2", new Address("St2", "City2", "22222"), Arrays.asList("hobby2"))
+                new Person(1L, "User1", new Address("St1", "City1", "11111"), List.of("hobby1")),
+                new Person(2L, "User2", new Address("St2", "City2", "22222"), List.of("hobby2"))
             );
 
             return new ComplexResult(data, persons, "SUCCESS");
