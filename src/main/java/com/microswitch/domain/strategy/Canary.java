@@ -23,9 +23,11 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
         public CanaryConfig {
             validatePercentages(primaryPercentage, secondaryPercentage);
             if (totalCalls <= 0) {
+                log.warn("[MICROSWITCH-EXCEPTION] - Invalid totalCalls value: {}, must be positive", totalCalls);
                 throw new IllegalArgumentException("Total calls must be positive, got: " + totalCalls);
             }
             if (algorithm == null) {
+                log.error("[MICROSWITCH-EXCEPTION] - Algorithm cannot be null in CanaryConfig");
                 throw new IllegalArgumentException("Algorithm cannot be null");
             }
         }
@@ -36,12 +38,15 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
 
         private static void validatePercentage(int primary, int secondary) {
             if (primary < 0 || primary > 100) {
+                log.warn("[MICROSWITCH-EXCEPTION] - Primary percentage out of range: {}, must be between 0 and 100", primary);
                 throw new IllegalArgumentException("Primary percentage must be between 0 and 100, got: " + primary);
             }
             if (secondary < 0 || secondary > 100) {
+                log.warn("[MICROSWITCH-EXCEPTION] - Secondary percentage out of range: {}, must be between 0 and 100", secondary);
                 throw new IllegalArgumentException("Secondary percentage must be between 0 and 100, got: " + secondary);
             }
             if (primary + secondary != 100) {
+                log.warn("[MICROSWITCH-EXCEPTION] - Percentage sum invalid: primary={}, secondary={}, sum={}, must equal 100", primary, secondary, primary + secondary);
                 throw new IllegalArgumentException("Primary and secondary percentages must sum to 100, got: " + (primary + secondary));
             }
         }
@@ -80,12 +85,15 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
     
     private void validateInputs(Supplier<?> primary, Supplier<?> secondary, String serviceKey) {
         if (primary == null) {
+            log.error("[MICROSWITCH-EXCEPTION] - Primary supplier is null in execute method");
             throw new IllegalArgumentException("Primary supplier cannot be null");
         }
         if (secondary == null) {
+            log.error("[MICROSWITCH-EXCEPTION] - Secondary supplier is null in execute method");
             throw new IllegalArgumentException("Secondary supplier cannot be null");
         }
         if (serviceKey == null || serviceKey.trim().isEmpty()) {
+            log.error("[MICROSWITCH-EXCEPTION] - Invalid service key: '{}', cannot be null or empty", serviceKey);
             throw new IllegalArgumentException("Service key cannot be null or empty");
         }
     }
@@ -110,6 +118,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
         try {
             int gcdValue = gcd(primaryPercentage, secondaryPercentage);
             if (gcdValue == 0) {
+                log.debug("[MICROSWITCH-EXCEPTION] - GCD calculation resulted in zero for percentages: primary={}, secondary={}, using fallback", primaryPercentage, secondaryPercentage);
                 throw new ArithmeticException("GCD calculation resulted in zero");
             }
             return 100 / gcdValue;
@@ -136,6 +145,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
     private int[] parseSlashFormat(String trimmed, String originalString) {
         String[] parts = trimmed.split("/");
         if (parts.length != 2) {
+            log.warn("[MICROSWITCH-EXCEPTION] - Invalid slash format in percentage string '{}', expected exactly 2 parts separated by '/', got {} parts", originalString, parts.length);
             throw new IllegalArgumentException("Invalid percentage format. Expected 'primary/secondary' (e.g., '10/90'), got: " + originalString);
         }
         
@@ -144,6 +154,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
             int secondary = Integer.parseInt(parts[1].trim());
             return processRawPercentages(primary, secondary);
         } catch (NumberFormatException e) {
+            log.warn("[MICROSWITCH-EXCEPTION] - Invalid number format in percentage string '{}': {}", originalString, e.getMessage());
             throw new IllegalArgumentException("Invalid number format in percentage string: " + originalString, e);
         }
     }
@@ -153,6 +164,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
         
         int sum = primary + secondary;
         if (sum == 0) {
+            log.warn("[MICROSWITCH-EXCEPTION] - Both primary and secondary percentage values are zero: primary={}, secondary={}", primary, secondary);
             throw new IllegalArgumentException("Primary and secondary values cannot both be zero");
         }
         
@@ -166,6 +178,7 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
     
     private void validateNonNegative(int primary, int secondary) {
         if (primary < 0 || secondary < 0) {
+            log.warn("[MICROSWITCH-EXCEPTION] - Negative percentage values detected: primary={}, secondary={}", primary, secondary);
             throw new IllegalArgumentException("Percentages cannot be negative. Got primary=" + primary + ", secondary=" + secondary);
         }
     }
@@ -181,11 +194,13 @@ public class Canary extends DeployTemplate implements DeploymentStrategy {
         try {
             int primary = Integer.parseInt(trimmed);
             if (primary < 0 || primary > 100) {
+                log.warn("[MICROSWITCH-EXCEPTION] - Primary percentage out of range in single number format: {}, input string: '{}'", primary, originalString);
                 throw new IllegalArgumentException("Primary percentage must be between 0 and 100, got: " + primary);
             }
             int secondary = 100 - primary;
             return new int[]{primary, secondary};
         } catch (NumberFormatException e) {
+            log.warn("[MICROSWITCH-EXCEPTION] - Invalid percentage format '{}': {}", originalString, e.getMessage());
             throw new IllegalArgumentException("Invalid percentage format. Expected number or 'primary/secondary' format, got: " + originalString, e);
         }
     }

@@ -156,6 +156,11 @@ public class DeploymentStrategyExecutor {
      */
     private <R> R executeStrategyByType(StrategyType strategyType, Supplier<R> primary, 
                                        Supplier<R> secondary, String serviceKey) {
+        if (!properties.isEnabled()) {
+            log.info("[MICROSWITCH-DISABLED] Microswitch is disabled globally, returning primary instance for service: '{}'", serviceKey);
+            return primary.get();
+        }
+        
         if (isExecutionLoggingEnabled()) {
             log.info("[MICROSWITCH-EXEC] Starting execution - Service: '{}', Strategy: '{}'", 
                     serviceKey, strategyType.getValue());

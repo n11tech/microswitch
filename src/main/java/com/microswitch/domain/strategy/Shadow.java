@@ -135,7 +135,7 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
 
     private <R> R executeAsyncSimultaneously(Supplier<R> primary, Supplier<R> secondary, InitializerConfiguration.Shadow shadowConfig, String serviceKey) {
         if (isShutdown) {
-            log.warn("Shadow executor is shutdown, falling back to stable method");
+            log.warn("[MICROSWITCH-SHADOW] - Shadow executor is shutdown, falling back to stable method");
             return executeStableMethod(primary, secondary, shadowConfig);
         }
 
@@ -154,14 +154,14 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
 
             R mirrorResult = futureMirror.handle((result, throwable) -> {
                 if (throwable != null) {
-                    log.warn("Mirror execution failed: {}", throwable.getMessage());
+                    log.warn("[MICROSWITCH-SHADOW] - Mirror execution failed: {}", throwable.getMessage());
                     return null;
                 }
                 return result;
             }).join();
 
             if (Objects.isNull(mirrorResult)) {
-                log.warn("Shadow result is null. The shadow function may have thrown an exception or returned null.");
+                log.warn("[MICROSWITCH-SHADOW] - Shadow result is null. The shadow function may have thrown an exception or returned null.");
             } else {
                 boolean useDeepComparison = isDeepComparisonEnabledForService(serviceKey);
 
@@ -201,7 +201,7 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
                 shadowExecutor.shutdownNow();
                 Thread.currentThread().interrupt();
             }
-            log.info("Shadow executor shutdown completed");
+            log.info("[MICROSWITCH-SHADOW] - Shadow executor shutdown completed");
         }
     }
 }
