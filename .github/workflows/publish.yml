@@ -9,6 +9,10 @@ on:
         description: 'Skip tests during publish'
         required: false
         default: 'true'
+      forcePublish:
+        description: 'Force publish by removing existing version if found'
+        required: false
+        default: 'true'
 
 permissions:
   contents: read
@@ -35,6 +39,61 @@ jobs:
           server-username: GITHUB_ACTOR         # env var provided by Actions
           server-password: GITHUB_TOKEN         # env var provided by Actions
 
+      - name: Extract version from pom.xml
+        id: extract_version
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+
+      - name: Check for existing package version
+        id: check_version
+        run: |
+          VERSION="${{ steps.extract_version.outputs.VERSION }}"
+          echo "Checking for existing package version: $VERSION"
+          
+          # List package versions using GitHub API
+          RESPONSE=$(curl -s -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/orgs/${{ github.repository_owner }}/packages/maven/microswitch/versions" || echo "[]")
+          
+          # Check if version exists in the response
+          VERSION_EXISTS=$(echo "$RESPONSE" | jq -r --arg version "$VERSION" '.[] | select(.name == $version) | .id')
+          
+          if [ -n "$VERSION_EXISTS" ] && [ "$VERSION_EXISTS" != "null" ]; then
+            echo "EXISTING_VERSION_ID=$VERSION_EXISTS" >> $GITHUB_OUTPUT
+            echo "EXISTS=true" >> $GITHUB_OUTPUT
+            echo "Found existing version $VERSION with ID: $VERSION_EXISTS"
+          else
+            echo "EXISTS=false" >> $GITHUB_OUTPUT
+            echo "Version $VERSION does not exist, proceeding with publish"
+          fi
+
+      - name: Delete existing package version
+        if: steps.check_version.outputs.EXISTS == 'true' && github.event.inputs.forcePublish == 'true'
+        run: |
+          VERSION="${{ steps.extract_version.outputs.VERSION }}"
+          VERSION_ID="${{ steps.check_version.outputs.EXISTING_VERSION_ID }}"
+          
+          echo "Deleting existing package version $VERSION (ID: $VERSION_ID)"
+          
+          curl -L -X DELETE \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/orgs/${{ github.repository_owner }}/packages/maven/microswitch/versions/$VERSION_ID"
+          
+          echo "Successfully deleted existing version $VERSION"
+
+      - name: Fail if version exists and force publish is disabled
+        if: steps.check_version.outputs.EXISTS == 'true' && github.event.inputs.forcePublish != 'true'
+        run: |
+          VERSION="${{ steps.extract_version.outputs.VERSION }}"
+          echo "ERROR: Package version $VERSION already exists!"
+          echo "To overwrite, set 'forcePublish' input to 'true' when running this workflow manually."
+          exit 1
+
       - name: Build and publish
         run: |
           mvn -B $([[ "${{ github.event.inputs.skipTests }}" != 'false' ]] && echo '-DskipTests') \
@@ -43,3 +102,9 @@ jobs:
             clean deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish summary
+        run: |
+          VERSION="${{ steps.extract_version.outputs.VERSION }}"
+          echo "✅ Successfully published microswitch version $VERSION to GitHub Packages"
+          echo "📦 Package URL: https://github.com/${{ github.repository_owner }}/microswitch/packages/"
