@@ -19,17 +19,16 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
     private final ExecutorService shadowExecutor;
     private volatile boolean isShutdown = false;
     private final DeepObjectComparator comparator;
-    private final boolean deepComparisonEnabled;
 
     public Shadow(InitializerConfiguration properties) {
         super(properties);
         this.shadowExecutor = Executors.newThreadPerTaskExecutor(
                 Thread.ofVirtual().name("shadow-virtual-", 0).factory()
         );
-        
-        this.deepComparisonEnabled = checkIfDeepComparisonEnabled(properties);
-        
-        if (this.deepComparisonEnabled) {
+
+        boolean deepComparisonEnabled = checkIfDeepComparisonEnabled(properties);
+
+        if (deepComparisonEnabled) {
             var cmpCfg = resolveComparatorConfig(properties);
             DeepObjectComparator.Builder builder = DeepObjectComparator.builder()
                     .withStrategy(DeepObjectComparator.ComparisonStrategy.HYBRID)
@@ -48,17 +47,17 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
 
             this.comparator = builder.build();
         } else {
-            this.comparator = null; 
+            this.comparator = null;
         }
-        
+
         Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
     }
-    
+
     private boolean checkIfDeepComparisonEnabled(InitializerConfiguration properties) {
         if (properties.getServices() != null) {
             for (var service : properties.getServices().values()) {
-                if (service.getShadow() != null && 
-                    "enable".equalsIgnoreCase(service.getShadow().getComparatorMode())) {
+                if (service.getShadow() != null &&
+                        "enable".equalsIgnoreCase(service.getShadow().getComparatorMode())) {
                     return true;
                 }
             }
@@ -85,7 +84,7 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
         }
         return null;
     }
-    
+
     private boolean isDeepComparisonEnabledForService(String serviceKey) {
         if (configuration.getServices() != null) {
             var service = configuration.getServices().get(serviceKey);
@@ -105,7 +104,7 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
         }
 
         var shadowConfig = serviceConfig.getShadow();
-        
+
         if (shadowConfig == null || shadowConfig.getMirrorPercentage() == null || shadowConfig.getMirrorPercentage() <= 0) {
             if (shadowConfig == null) {
                 return primary.get();
@@ -165,38 +164,24 @@ public class Shadow extends DeployTemplate implements DeploymentStrategy {
                 log.warn("Shadow result is null. The shadow function may have thrown an exception or returned null.");
             } else {
                 boolean useDeepComparison = isDeepComparisonEnabledForService(serviceKey);
-                
+
                 boolean resultsMatch;
                 if (useDeepComparison && comparator != null) {
                     resultsMatch = comparator.areEqual(stableResult, mirrorResult);
                     if (!resultsMatch) {
-                        log.warn("Shadow result does not match stable result for service: {}. " +
+                        log.warn("[MICROSWITCH-COMPARISON] Shadow result does not match stable result for service: {}. " +
                                 "Deep comparison detected differences in object fields.", serviceKey);
                     } else {
-                        log.info("Shadow execution successful - results match for service: {} " +
+                        log.info("[MICROSWITCH-COMPARISON] Shadow execution successful - results match for service: {} " +
                                 "(deep comparison validated)", serviceKey);
                     }
-                } else {
-                    // Use standard equals() method
-                    resultsMatch = stableResult.equals(mirrorResult);
-                    if (!resultsMatch) {
-                        log.warn("Shadow result does not match stable result for service: {} " +
-                                "(using standard equals)", serviceKey);
-                    } else {
-                        log.info("Shadow execution successful - results match for service: {} " +
-                                "(standard comparison)", serviceKey);
-                    }
-                }
-                
-                if (!resultsMatch && log.isDebugEnabled()) {
-                    log.debug("Stable result: {}, Mirror result: {}", stableResult, mirrorResult);
                 }
             }
 
             return stableResult;
 
         } catch (CompletionException e) {
-            log.error("Shadow execution timeout or failure for service {}: {}", serviceKey, e.getMessage());
+            log.error("[MICROSWITCH-DEPLOYMENT] Shadow execution timeout or failure for service {}: {}", serviceKey, e.getMessage());
             return executeStableMethod(primary, secondary, shadowConfig);
         }
     }

@@ -3,6 +3,7 @@ package com.microswitch.domain.util;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,10 +16,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * Efficient deep object comparator for shadow traffic validation.
  * Provides multiple comparison strategies optimized for different scenarios.
  */
+@Slf4j
 public class DeepObjectComparator {
-    
-    private static final Logger log = LoggerFactory.getLogger(DeepObjectComparator.class);
-    
+
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
             .configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
@@ -405,7 +405,6 @@ public class DeepObjectComparator {
                         return false;
                     }
                 }
-                return true;
             } else {
                 for (int i = 0; i < size; i++) {
                     if (!compareFieldValues(l1.get(i), l2.get(i), depth + 1, visited, startedAtNanos)) {
@@ -415,8 +414,8 @@ public class DeepObjectComparator {
                         return false;
                     }
                 }
-                return true;
             }
+            return true;
         }
         
         // For sets, check containment
