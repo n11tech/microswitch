@@ -53,21 +53,44 @@ jobs:
           echo "Checking for existing package version: $VERSION"
           
           # List package versions using GitHub API
-          RESPONSE=$(curl -s -H "Accept: application/vnd.github+json" \
+          RESPONSE=$(curl -s -w "\n%{http_code}" -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/orgs/${{ github.repository_owner }}/packages/maven/microswitch/versions" || echo "[]")
+            "https://api.github.com/orgs/${{ github.repository_owner }}/packages/maven/microswitch/versions")
           
-          # Check if version exists in the response
-          VERSION_EXISTS=$(echo "$RESPONSE" | jq -r --arg version "$VERSION" '.[] | select(.name == $version) | .id')
+          # Extract HTTP status code and response body
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
           
-          if [ -n "$VERSION_EXISTS" ] && [ "$VERSION_EXISTS" != "null" ]; then
-            echo "EXISTING_VERSION_ID=$VERSION_EXISTS" >> $GITHUB_OUTPUT
-            echo "EXISTS=true" >> $GITHUB_OUTPUT
-            echo "Found existing version $VERSION with ID: $VERSION_EXISTS"
-          else
+          # Handle different response codes
+          if [ "$HTTP_CODE" = "404" ]; then
+            echo "Package 'microswitch' not found (may not have been published yet)"
             echo "EXISTS=false" >> $GITHUB_OUTPUT
             echo "Version $VERSION does not exist, proceeding with publish"
+          elif [ "$HTTP_CODE" = "200" ]; then
+            # Check if the response is a valid JSON array
+            if echo "$BODY" | jq -e . >/dev/null 2>&1; then
+              # Check if version exists in the response
+              VERSION_EXISTS=$(echo "$BODY" | jq -r --arg version "$VERSION" '.[] | select(.name == $version) | .id // empty')
+              
+              if [ -n "$VERSION_EXISTS" ]; then
+                echo "EXISTING_VERSION_ID=$VERSION_EXISTS" >> $GITHUB_OUTPUT
+                echo "EXISTS=true" >> $GITHUB_OUTPUT
+                echo "Found existing version $VERSION with ID: $VERSION_EXISTS"
+              else
+                echo "EXISTS=false" >> $GITHUB_OUTPUT
+                echo "Version $VERSION does not exist, proceeding with publish"
+              fi
+            else
+              echo "Invalid JSON response from API"
+              echo "EXISTS=false" >> $GITHUB_OUTPUT
+              echo "Assuming version does not exist, proceeding with publish"
+            fi
+          else
+            echo "Unexpected HTTP status code: $HTTP_CODE"
+            echo "Response body: $BODY"
+            echo "EXISTS=false" >> $GITHUB_OUTPUT
+            echo "Assuming version does not exist, proceeding with publish"
           fi
 
       - name: Delete existing package version
