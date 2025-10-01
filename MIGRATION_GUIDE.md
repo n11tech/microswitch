@@ -20,7 +20,7 @@ The groupId has been changed from `io.development.n11tech` to `io.github.n11tech
 <dependency>
   <groupId>io.development.n11tech</groupId>
   <artifactId>microswitch</artifactId>
-  <version>1.4.6</version>
+  <version>1.4.8</version>
 </dependency>
 ```
 
@@ -29,7 +29,7 @@ The groupId has been changed from `io.development.n11tech` to `io.github.n11tech
 <dependency>
   <groupId>io.github.n11tech</groupId>
   <artifactId>microswitch</artifactId>
-  <version>1.4.6</version>
+  <version>1.4.8</version>
 </dependency>
 ```
 
@@ -37,12 +37,12 @@ The groupId has been changed from `io.development.n11tech` to `io.github.n11tech
 
 **Old:**
 ```gradle
-implementation 'io.development.n11tech:microswitch:1.4.6'
+implementation 'io.development.n11tech:microswitch:1.4.8'
 ```
 
 **New:**
 ```gradle
-implementation 'io.github.n11tech:microswitch:1.4.6'
+implementation 'io.github.n11tech:microswitch:1.4.8'
 ```
 
 #### 3. Update JPMS module-info.java (if using Java modules)
@@ -88,10 +88,36 @@ The GitHub Packages repository configuration remains the same:
 </repositories>
 ```
 
+### Recommended: Use JitPack Instead
+
+For easier consumption without authentication, consider using JitPack:
+
+```xml
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+
+<dependency>
+    <groupId>com.github.n11tech</groupId>
+    <artifactId>microswitch</artifactId>
+    <version>v1.4.8</version>
+</dependency>
+```
+
+**Benefits of JitPack:**
+- No authentication required
+- Works with public GitHub repositories
+- Automatic builds from tags
+- Same JPMS module name (`io.github.n11tech.microswitch`)
+
 ### Version Compatibility
 
 - Last version with old groupId: `io.development.n11tech:microswitch:1.4.6`
-- First version with new groupId: `io.github.n11tech:microswitch:1.4.7` (next release)
+- First version with new groupId: `io.github.n11tech:microswitch:1.4.7`
+- Latest stable version: `io.github.n11tech:microswitch:1.4.8`
 
 ### FAQ
 

@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [1.4.8] - 2025-01-30
+
+### Fixed
+- Fixed JitPack build issues with Java 21 and JPMS modules
+- Added `jitpack.yml` configuration to ensure OpenJDK 21 is used
+- Updated Maven compiler plugin configuration for better compatibility
+- Resolved GitHub Packages version conflict by bumping to 1.4.8
+
+### Documentation
+- Added troubleshooting section for module-path errors in JitPack guide
+
 ## [1.4.7] - 2025-01-30
 
 ### Breaking Changes

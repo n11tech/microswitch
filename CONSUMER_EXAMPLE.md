@@ -1,6 +1,27 @@
-# Example: How to Consume Microswitch from GitHub Packages
+# Example: How to Consume Microswitch
 
-## Quick Setup Guide
+## Recommended: Use JitPack (No Authentication Required)
+
+For the easiest setup without authentication, use JitPack instead:
+
+```xml
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+
+<dependency>
+    <groupId>com.github.n11tech</groupId>
+    <artifactId>microswitch</artifactId>
+    <version>v1.4.8</version>
+</dependency>
+```
+
+## Alternative: GitHub Packages Setup Guide
+
+**Note: GitHub Packages requires authentication even for public packages.**
 
 ### Step 1: Create a test project
 
@@ -48,7 +69,7 @@ cd microswitch-consumer-test
         <dependency>
             <groupId>io.github.n11tech</groupId>
             <artifactId>microswitch</artifactId>
-            <version>1.4.6</version>
+            <version>1.4.8</version>
         </dependency>
 
         <!-- Spring Boot Starter -->

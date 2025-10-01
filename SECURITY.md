@@ -51,4 +51,4 @@ If you discover an issue in a transitive dependency used by Microswitch, please 
 
 ## Contact
 
-Security questions: development@n11.com
+Security questions: Itarchitectteam@n11.com

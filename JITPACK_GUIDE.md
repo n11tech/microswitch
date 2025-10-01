@@ -18,7 +18,7 @@ Add JitPack repository and the dependency:
     <dependency>
         <groupId>com.github.n11tech</groupId>
         <artifactId>microswitch</artifactId>
-        <version>v1.4.7</version>
+        <version>v1.4.8</version>
     </dependency>
 </dependencies>
 ```
@@ -32,7 +32,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.n11tech:microswitch:v1.4.7'
+    implementation 'com.github.n11tech:microswitch:v1.4.8'
 }
 ```
 
@@ -42,8 +42,8 @@ You can use various version formats:
 
 ```xml
 <!-- Release tags -->
-<version>v1.4.7</version>        <!-- Latest release -->
-<version>v1.4.6</version>        <!-- Previous release -->
+<version>v1.4.8</version>        <!-- Latest release -->
+<version>v1.4.7</version>        <!-- Previous release -->
 
 <!-- Branch snapshots -->
 <version>main-SNAPSHOT</version>  <!-- Latest from main branch -->
@@ -62,8 +62,8 @@ You can use various version formats:
 
 1. **Create and push a tag:**
 ```bash
-git tag v1.4.8
-git push origin v1.4.8
+git tag v1.4.9
+git push origin v1.4.9
 ```
 
 2. **That's it!** JitPack will automatically:
@@ -77,7 +77,7 @@ Check build status at:
 - https://jitpack.io/#n11tech/microswitch
 
 View specific version build:
-- https://jitpack.io/#n11tech/microswitch/v1.4.7
+- https://jitpack.io/#n11tech/microswitch/v1.4.8
 
 ### JitPack Build Badge
 

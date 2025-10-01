@@ -53,7 +53,7 @@ Maven
 <dependency>
     <groupId>com.github.n11tech</groupId>
     <artifactId>microswitch</artifactId>
-    <version>v1.4.7</version>  <!-- JitPack uses tag name with 'v' prefix -->
+    <version>v1.4.8</version>  <!-- JitPack uses tag name with 'v' prefix -->
 </dependency>
 ```
 
@@ -64,7 +64,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.n11tech:microswitch:v1.4.7'  // JitPack uses tag name with 'v' prefix
+    implementation 'com.github.n11tech:microswitch:v1.4.8'  // JitPack uses tag name with 'v' prefix
 }
 ```
 
@@ -97,7 +97,7 @@ Maven
 <dependency>
     <groupId>io.github.n11tech</groupId>
     <artifactId>microswitch</artifactId>
-    <version>1.4.7</version>
+    <version>1.4.8</version>
 </dependency>
 ```
 
@@ -114,7 +114,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.github.n11tech:microswitch:1.4.7'
+    implementation 'io.github.n11tech:microswitch:1.4.8'
 }
 ```
 
@@ -224,7 +224,13 @@ String result = deploymentManager.blueGreen(
 
 See the full changelog here: [CHANGELOG.md](CHANGELOG.md)
 
-### Version 1.4.7 (Latest)
+### Version 1.4.8 (Latest)
+
+#### New in 1.4.8 — JitPack Build Fixes
+
+- **Fixed**: JitPack build issues with Java 21 and JPMS modules
+- **Added**: `jitpack.yml` configuration to ensure OpenJDK 21 is used
+- **Updated**: Maven compiler plugin configuration for better compatibility
 
 #### New in 1.4.7 — GroupId Migration and JitPack Support
 
@@ -922,5 +928,5 @@ https://www.apache.org/licenses/LICENSE-2.0
 
 ## Support
 
-- Email: development@n11.com
+- Email: Itarchitectteam@n11.com
 - Issues: https://github.com/n11tech/microswitch/issues
