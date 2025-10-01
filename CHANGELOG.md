@@ -4,6 +4,42 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.4.7] - 2025-01-30
+
+### Breaking Changes
+- **Maven GroupId Migration**: Changed from `io.development.n11tech` to `io.github.n11tech` to follow Maven Central naming conventions for GitHub-hosted projects
+  - Old coordinates: `io.development.n11tech:microswitch`
+  - New coordinates: `io.github.n11tech:microswitch`
+  - JPMS module name changed: `io.github.n11tech.microswitch`
+  - Update your dependencies and module-info.java accordingly
+
+### Added
+- **JitPack Support**: Added primary distribution through JitPack for truly public access without authentication
+  - Users can now use `com.github.n11tech:microswitch:v1.4.7` via JitPack
+  - No GitHub token required for public consumption
+  - Added JitPack badge to README
+  - Created comprehensive JITPACK_GUIDE.md for users and maintainers
+  - Created MIGRATION_GUIDE.md for GroupId migration instructions
+  - Created CONSUMER_EXAMPLE.md with usage examples
+
+### Changed
+- Updated all documentation to reflect new `io.github.n11tech` groupId
+- README now lists JitPack as the primary recommended installation method
+- GitHub Packages remains as secondary option (requires authentication)
+- Simplified GitHub Actions publish workflow by removing version checking and deletion stages
+- Updated all JPMS module references to `io.github.n11tech.microswitch`
+
+### Fixed
+- Removed unnecessary `requires java.desktop;` from module-info.java
+
+### Documentation
+- Updated README.md with dual installation options (JitPack and GitHub Packages)
+- Added comprehensive migration guide for consumers
+- Enhanced installation instructions with authentication requirements clarification
+- Added JitPack usage guide with version options and troubleshooting
+
 ## [1.4.6] - 2025-01-29
 
 ### Added

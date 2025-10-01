@@ -1,5 +1,8 @@
 # 🚀 Microswitch — Deployment Strategy Library
 
+[![](https://jitpack.io/v/n11tech/microswitch.svg)](https://jitpack.io/#n11tech/microswitch)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 Microswitch is a lightweight library for Java/Spring Boot that lets you apply deployment strategies programmatically: Canary, Shadow, and Blue/Green. It provides a single, minimal public API and hides all internals via JPMS.
 
 This README explains how to add Microswitch to your project, configure it, and use it safely in production.
@@ -36,21 +39,83 @@ This README explains how to add Microswitch to your project, configure it, and u
 
 ## Installation
 
-Maven
+### Option 1: JitPack (No Authentication Required) ⭐ Recommended
 
+Maven
 ```xml
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+
 <dependency>
-  <groupId>io.development.n11tech</groupId>
-  <artifactId>microswitch</artifactId>
-  <version>1.4.6</version>
-  <scope>compile</scope>
+    <groupId>com.github.n11tech</groupId>
+    <artifactId>microswitch</artifactId>
+    <version>v1.4.7</version>  <!-- JitPack uses tag name with 'v' prefix -->
 </dependency>
 ```
 
 Gradle
-
 ```gradle
-implementation 'io.development.n11tech:microswitch:1.4.6'
+repositories {
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    implementation 'com.github.n11tech:microswitch:v1.4.7'  // JitPack uses tag name with 'v' prefix
+}
+```
+
+### Option 2: GitHub Packages (Authentication Required)
+
+First, configure authentication in `~/.m2/settings.xml`:
+```xml
+<settings>
+  <servers>
+    <server>
+      <id>github</id>
+      <username>YOUR_GITHUB_USERNAME</username>
+      <password>YOUR_GITHUB_TOKEN</password>
+    </server>
+  </servers>
+</settings>
+```
+
+Then add to your project:
+
+Maven
+```xml
+<repositories>
+    <repository>
+        <id>github</id>
+        <url>https://maven.pkg.github.com/n11tech/microswitch</url>
+    </repository>
+</repositories>
+
+<dependency>
+    <groupId>io.github.n11tech</groupId>
+    <artifactId>microswitch</artifactId>
+    <version>1.4.7</version>
+</dependency>
+```
+
+Gradle
+```gradle
+repositories {
+    maven {
+        url = uri("https://maven.pkg.github.com/n11tech/microswitch")
+        credentials {
+            username = project.findProperty("gpr.user") ?: System.getenv("USERNAME")
+            password = project.findProperty("gpr.key") ?: System.getenv("TOKEN")
+        }
+    }
+}
+
+dependencies {
+    implementation 'io.github.n11tech:microswitch:1.4.7'
+}
 ```
 
 ## Quick Start
@@ -159,9 +224,17 @@ String result = deploymentManager.blueGreen(
 
 See the full changelog here: [CHANGELOG.md](CHANGELOG.md)
 
-### Version 1.4.6 (Latest)
+### Version 1.4.7 (Latest)
 
-#### New in 1.4.6 — Enhanced Stability and Performance
+#### New in 1.4.7 — GroupId Migration and JitPack Support
+
+See [CHANGELOG.md](CHANGELOG.md) for complete details. Major changes include:
+
+- **Breaking Change**: Maven GroupId changed from `io.development.n11tech` to `io.github.n11tech`
+- **JitPack Support**: Now available via JitPack without authentication requirement
+- **Simplified Workflow**: Removed complex version checking from GitHub Actions
+
+#### Carried over from 1.4.6 — Enhanced Stability and Performance
 
 1) Comparator tuning for large data structures (Shadow strategy)
 
@@ -549,7 +622,7 @@ If you use JPMS (module-path), add Microswitch to your `module-info.java`:
 module your.app.module {
   requires spring.boot;
   requires spring.boot.autoconfigure;
-  requires io.development.n11tech.microswitch; // Microswitch public API
+  requires io.github.n11tech.microswitch; // Microswitch public API
   // ... other requires
 }
 ```
@@ -745,11 +818,11 @@ public void onApplicationReady(ApplicationReadyEvent event) {
 Error: No qualifying bean of type 'DeploymentManager'
 ```
 
-**Solution 1**: If you're using an older version (< v1.1.1), add `io.development.n11tech` into your `@ComponentScan`:
+**Solution 1**: If you're using an older version (< v1.1.1), add `io.github.n11tech` into your `@ComponentScan`:
 
 ```java
 @SpringBootApplication
-@ComponentScan(basePackages = {"com.yourpackage", "io.development.n11tech"})
+@ComponentScan(basePackages = {"com.yourpackage", "io.github.n11tech"})
 public class Application {
     // ...
 }
@@ -759,9 +832,9 @@ public class Application {
 
 ```xml
 <dependency>
-  <groupId>io.development.n11tech</groupId>
+  <groupId>io.github.n11tech</groupId>
   <artifactId>microswitch</artifactId>
-  <version>1.4.6</version>
+  <version>1.4.7</version>
 </dependency>
 ```
 
@@ -787,7 +860,7 @@ public class Application {
 ```yaml
 logging:
   level:
-    io.development.n11tech: DEBUG
+    io.github.n11tech: DEBUG
 ```
 
 ### Health Check
@@ -819,7 +892,7 @@ public class MicroswitchHealthCheck {
 
 ```java
 module com.example.microswitch {
-    requires io.development.n11tech.microswitch;
+    requires io.github.n11tech.microswitch;
     // ...
 }
 ```

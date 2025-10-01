@@ -1,4 +1,4 @@
-module io.development.n11tech.microswitch {
+module io.github.n11tech.microswitch {
     // Export ONLY the public API - DeploymentManager
     // This is the ONLY class that consuming applications can access
     exports com.microswitch.infrastructure.manager;
@@ -47,5 +47,4 @@ module io.development.n11tech.microswitch {
 
     // Lombok is used at compile-time only; mark as static
     requires static lombok;
-    requires java.desktop;
 }
