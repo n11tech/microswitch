@@ -1,0 +1,5 @@
+jdk:
+  - openjdk21
+
+# Ensure JitPack uses Java 21 for building
+# This is required because the project uses Java 21 features and JPMS modules

@@ -125,6 +125,12 @@
                 <version>${maven-compiler-plugin.version}</version>
                 <configuration>
                     <release>21</release>
+                    <source>21</source>
+                    <target>21</target>
+                    <compilerArgs>
+                        <arg>--add-modules</arg>
+                        <arg>java.base</arg>
+                    </compilerArgs>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>
