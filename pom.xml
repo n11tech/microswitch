@@ -13,7 +13,7 @@
 
     <groupId>io.github.n11tech</groupId>
     <artifactId>microswitch</artifactId>
-    <version>1.4.7</version>
+    <version>1.4.8</version>
     <packaging>jar</packaging>
 
     <name>microswitch</name>

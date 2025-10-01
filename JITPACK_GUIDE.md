@@ -127,6 +127,12 @@ Note: The module name (`io.github.n11tech.microswitch`) remains the same regardl
 - Ensure your project builds with: `mvn clean install`
 - JitPack uses Java 8, 11, 17, or 21 (auto-detected from pom.xml)
 
+### Module-Path Error
+If you see `invalid flag: --module-path` error:
+- Ensure `jitpack.yml` exists with `jdk: openjdk21`
+- The project uses Java 21 and JPMS modules
+- JitPack must use Java 21 to build correctly
+
 ### Dependency Not Found
 ```
 Could not find com.github.n11tech:microswitch:vX.X.X
